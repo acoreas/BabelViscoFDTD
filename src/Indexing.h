@@ -1,6 +1,69 @@
 #ifndef INDEXING_DEF
 #define INDEXING_DEF
 
+#if defined(CUDA)
+struct InputDataKernel
+  {
+  	mexType
+  	*V_x_x_pr,
+      *V_y_x_pr,
+      *V_z_x_pr,
+      *V_x_y_pr,
+      *V_y_y_pr,
+      *V_z_y_pr,
+      *V_x_z_pr,
+      *V_y_z_pr,
+      *V_z_z_pr,
+      *Vx_pr,
+      *Vy_pr,
+      *Vz_pr,
+      *Rxx_pr,
+      *Ryy_pr,
+      *Rzz_pr,
+      *Rxy_pr,
+      *Rxz_pr,
+      *Ryz_pr,
+	  *Sigma_x_xx_pr,
+      *Sigma_y_xx_pr,
+      *Sigma_z_xx_pr,
+      *Sigma_x_yy_pr,
+      *Sigma_y_yy_pr,
+      *Sigma_z_yy_pr,
+      *Sigma_x_zz_pr,
+      *Sigma_y_zz_pr,
+      *Sigma_z_zz_pr,
+      *Sigma_x_xy_pr,
+      *Sigma_y_xy_pr,
+      *Sigma_x_xz_pr,
+      *Sigma_z_xz_pr,
+      *Sigma_y_yz_pr,
+      *Sigma_z_yz_pr,
+      *Sigma_xy_pr,
+      *Sigma_xz_pr,
+      *Sigma_yz_pr,
+      *Sigma_xx_pr,
+      *Sigma_yy_pr,
+      *Sigma_zz_pr,
+	  *Pressure_pr,
+	  *SourceFunctions_pr,
+      * LambdaMiuMatOverH_pr,
+      * LambdaMatOverH_pr,
+      * MiuMatOverH_pr,
+      * TauLong_pr,
+      * OneOverTauSigma_pr,
+      * TauShear_pr,
+      * InvRhoMatH_pr,
+      * SqrAcc_pr,
+			* SensorOutput_pr;
+			unsigned int * MaterialMap_pr,
+      * SourceMap_pr;
+			mexType * Ox_pr,
+			* Oy_pr,
+			* Oz_pr;
+  };
+
+#endif
+
 typedef unsigned char interface_t;
 #define inside 0x00
 #define frontLine 0x01
