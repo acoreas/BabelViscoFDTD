@@ -38,26 +38,16 @@ typedef _PT tIndex ;
 #define CA (1.1250)
 #define CB (0.0416666666666666643537020320309)
 
-#if defined(METAL)
-#define CONCAT2(a, b) a ## b
-#define CONCAT(a, b) CONCAT2(a, b)
-#endif
-
 #if defined(CUDA)
 #define __PRE_MAT 
 #elif defined(METAL)
-#define __PRE_MAT k_
+#define __PRE_MAT pp->
 #else
 #define __PRE_MAT
 #endif
 
-#if defined(METAL)
-#define EL(_Mat,_i,_j,_k) CONCAT(__PRE_MAT,_Mat ## _pr[Ind_##_Mat(_i,_j,_k)])
-#define ELD(_Mat,_index) CONCAT(__PRE_MAT,_Mat ## _pr[_index])
-#else
 #define EL(_Mat,_i,_j,_k) __PRE_MAT _Mat##_pr[Ind_##_Mat(_i,_j,_k)]
 #define ELD(_Mat,_index) __PRE_MAT _Mat##_pr[_index]
-#endif
 
 #define ELO(_Mat,_i,_j,_k)  _Mat##_pr[Ind_##_Mat(_i,_j,_k)]
 #define ELDO(_Mat,_index)  _Mat##_pr[_index]
@@ -320,150 +310,5 @@ if IS_ ## _VarName ## _SELECTED(INHOST(SelMapsRMSPeak)) \
  {\
  	 INHOST(IndexSensor_ ## _VarName)=curMapIndex;\
  	 curMapIndex++; }
-
-#if defined(METAL)
-#define CInd_N1 0
-#define CInd_N2 1
-#define CInd_N3 2
-#define CInd_Limit_I_low_PML 3
-#define CInd_Limit_J_low_PML 4
-#define CInd_Limit_K_low_PML 5
-#define CInd_Limit_I_up_PML 6
-#define CInd_Limit_J_up_PML 7
-#define CInd_Limit_K_up_PML 8
-#define CInd_SizeCorrI 9
-#define CInd_SizeCorrJ 10
-#define CInd_SizeCorrK 11
-#define CInd_PML_Thickness 12
-#define CInd_NumberSources 13
-#define CInd_NumberSensors 14
-#define CInd_TimeSteps 15
-#define CInd_SizePML 16
-#define CInd_SizePMLxp1 17
-#define CInd_SizePMLyp1 18
-#define CInd_SizePMLzp1 19
-#define CInd_SizePMLxp1yp1zp1 20
-#define CInd_ZoneCount 21
-#define CInd_SelRMSorPeak 22
-#define CInd_SelMapsRMSPeak 23
-#define CInd_IndexRMSPeak_ALLV 24
-#define CInd_IndexRMSPeak_Vx 25
-#define CInd_IndexRMSPeak_Vy 26
-#define CInd_IndexRMSPeak_Vz 27
-#define CInd_IndexRMSPeak_Sigmaxx 28
-#define CInd_IndexRMSPeak_Sigmayy 29
-#define CInd_IndexRMSPeak_Sigmazz 30
-#define CInd_IndexRMSPeak_Sigmaxy 31
-#define CInd_IndexRMSPeak_Sigmaxz 32
-#define CInd_IndexRMSPeak_Sigmayz 33
-#define CInd_NumberSelRMSPeakMaps 34
-#define CInd_SelMapsSensors 35
-#define CInd_IndexSensor_ALLV 36
-#define CInd_IndexSensor_Vx 37
-#define CInd_IndexSensor_Vy 38
-#define CInd_IndexSensor_Vz 39
-#define CInd_IndexSensor_Sigmaxx 40
-#define CInd_IndexSensor_Sigmayy 41
-#define CInd_IndexSensor_Sigmazz 42
-#define CInd_IndexSensor_Sigmaxy 43
-#define CInd_IndexSensor_Sigmaxz 44
-#define CInd_IndexSensor_Sigmayz 45
-#define CInd_NumberSelSensorMaps 46
-#define CInd_SensorSubSampling 47
-#define CInd_nStep 48
-#define CInd_TypeSource 49
-#define CInd_CurrSnap 50
-#define CInd_LengthSource 51
-#define CInd_SelK 52
-#define CInd_IndexRMSPeak_Pressure 53
-#define CInd_IndexSensor_Pressure 54
-#define CInd_SensorStart 55
-
-//Make LENGTH_CONST_UINT one value larger than the last index
-#define LENGTH_CONST_UINT 56
-
-//Indexes for float
-#define CInd_DT 0
-#define CInd_InvDXDTplus 1
-#define CInd_DXDTminus (1+MAX_SIZE_PML)
-#define CInd_InvDXDTplushp (1+MAX_SIZE_PML*2)
-#define CInd_DXDTminushp (1+MAX_SIZE_PML*3)
-//Make LENGTH_CONST_MEX one value larger than the last index
-#define LENGTH_CONST_MEX (1+MAX_SIZE_PML*4)
-
-#define CInd_V_x_x 0
-#define CInd_V_y_x 1
-#define CInd_V_z_x 2
-#define CInd_V_x_y 3
-#define CInd_V_y_y 4
-#define CInd_V_z_y 5
-#define CInd_V_x_z 6
-#define CInd_V_y_z 7
-#define CInd_V_z_z 8
-
-#define CInd_Vx 9
-#define CInd_Vy 10
-#define CInd_Vz 11
-
-#define CInd_Rxx 12
-#define CInd_Ryy 13
-#define CInd_Rzz 14
-
-#define CInd_Rxy 15
-#define CInd_Rxz 16
-#define CInd_Ryz 17
-
-#define CInd_Sigma_x_xx 18
-#define CInd_Sigma_y_xx 19
-#define CInd_Sigma_z_xx 20
-#define CInd_Sigma_x_yy 21
-#define CInd_Sigma_y_yy 22
-#define CInd_Sigma_z_yy 23
-#define CInd_Sigma_x_zz 24
-#define CInd_Sigma_y_zz 25
-
-#define CInd_Sigma_z_zz 26
-#define CInd_Sigma_x_xy 27
-#define CInd_Sigma_y_xy 28
-#define CInd_Sigma_x_xz 29
-#define CInd_Sigma_z_xz 30
-#define CInd_Sigma_y_yz 31
-#define CInd_Sigma_z_yz 32
-
-#define CInd_Sigma_xy 33
-#define CInd_Sigma_xz 34
-#define CInd_Sigma_yz 35
-
-#define CInd_Sigma_xx 36
-#define CInd_Sigma_yy 37
-#define CInd_Sigma_zz 38
-
-#define CInd_SourceFunctions 39
-
-#define CInd_LambdaMiuMatOverH  40
-#define CInd_LambdaMatOverH	 41
-#define CInd_MiuMatOverH 42
-#define CInd_TauLong 43
-#define CInd_OneOverTauSigma	44
-#define CInd_TauShear 45
-#define CInd_InvRhoMatH	 46
-#define CInd_Ox 47
-#define CInd_Oy 48
-#define CInd_Oz 49
-#define CInd_Pressure 50
-
-#define CInd_SqrAcc 51
-
-#define CInd_SensorOutput 52
-
-#define LENGTH_INDEX_MEX 53
-
-#define CInd_IndexSensorMap  0
-#define CInd_SourceMap	1
-#define CInd_MaterialMap 2
-
-#define LENGTH_INDEX_UINT 3
-
-#endif
 
 #endif
