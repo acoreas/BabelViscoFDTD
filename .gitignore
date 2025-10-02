@@ -3,6 +3,7 @@
 *.lo
 *.o
 *.ini
+!pytest.ini
 *.DS_Store
 
 # Compiled Dynamic libraries
