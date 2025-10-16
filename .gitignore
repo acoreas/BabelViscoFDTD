@@ -284,3 +284,4 @@ _indexing.h
 src/Metal/.build/
 Tutorial Notebooks/2D/.ipynb_checkpoints/1 - Basis of operation and flat source homogenous medium-checkpoint.ipynb
 BabelViscoFDTD/_gpu_kernel2D.c
+Pytest_Reports/
