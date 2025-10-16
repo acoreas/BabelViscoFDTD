@@ -422,35 +422,60 @@ def image_to_base64():
 
 @pytest.fixture()
 def get_mpl_plot():
-    def _get_mpl_plot(datas,axes_num=1,titles=None, color_map='viridis'):
+    def _get_mpl_plot(datas,axes_num=1,titles=None, color_map='viridis',colorbar=False,clim=None):
 
         data_num = len(datas)
         fig, axs = plt.subplots(axes_num, data_num, figsize = (data_num * 2.5, axes_num * 2.5))
-
+        
         for axis in range(axes_num):
             for num in range(data_num):
                 midpoint = datas[num].shape[axis]//2
 
-                try:
+                if axes_num > 1 and data_num > 1:
                     if axis == 0:
-                        axs[axis,num].imshow(np.rot90(datas[num][midpoint,:,:]), cmap=color_map)
+                        im = axs[axis,num].imshow(np.rot90(datas[num][midpoint,:,:]), cmap=color_map)
                     elif axis == 1:
-                        axs[axis,num].imshow(np.rot90(datas[num][:,midpoint,:]), cmap=color_map)
+                        im = axs[axis,num].imshow(np.rot90(datas[num][:,midpoint,:]), cmap=color_map)
                     else:
-                        axs[axis,num].imshow(datas[num][:,:,midpoint], cmap=color_map)
+                        im = axs[axis,num].imshow(datas[num][:,:,midpoint], cmap=color_map)
 
                     if titles is not None and axis == 0:
                         axs[axis,num].set_title(titles[num])
-                except:
+                        
+                    if colorbar:
+                        if clim is not None:
+                            im.set_clim(clim)
+                        fig.colorbar(im, ax=axs[axis, num], shrink=0.7)
+                elif axes_num == 1 and data_num == 1:
                     if axis == 0:
-                        axs[num].imshow(np.rot90(datas[num][midpoint,:,:]), cmap=color_map)
+                        im = axs.imshow(np.rot90(datas[num][midpoint,:,:]), cmap=color_map)
                     elif axis == 1:
-                        axs[num].imshow(np.rot90(datas[num][:,midpoint,:]), cmap=color_map)
+                        im = axs.imshow(np.rot90(datas[num][:,midpoint,:]), cmap=color_map)
                     else:
-                        axs[num].imshow(datas[num][:,:,midpoint], cmap=color_map)
+                        im = axs.imshow(datas[num][:,:,midpoint], cmap=color_map)
+
+                    if titles is not None and axis == 0:
+                        axs.set_title(titles[num],fontsize=14)
+                        
+                    if colorbar:
+                        if clim is not None:
+                            im.set_clim(clim)
+                        fig.colorbar(im, ax=axs, shrink=0.7)
+                else:  
+                    if axis == 0:
+                        im = axs[num].imshow(np.rot90(datas[num][midpoint,:,:]), cmap=color_map)
+                    elif axis == 1:
+                        im = axs[num].imshow(np.rot90(datas[num][:,midpoint,:]), cmap=color_map)
+                    else:
+                        im = axs[num].imshow(datas[num][:,:,midpoint], cmap=color_map)
 
                     if titles is not None and axis == 0:
                         axs[num].set_title(titles[num],fontsize=14)
+                        
+                    if colorbar:
+                        if clim is not None:
+                            im.set_clim(clim)
+                        fig.colorbar(im, ax=axs[num], shrink=0.7)
 
         # Adjust plots
         plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.5, hspace=0.5)
