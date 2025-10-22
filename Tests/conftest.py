@@ -493,6 +493,60 @@ def get_mpl_plot():
     
     return _get_mpl_plot
 
+@pytest.fixture()
+def get_line_plot():
+    def _get_line_plot(x, data_list, labels=None, title=None, xlabel='X', ylabel='Y'):
+        """
+        Plot multiple data arrays against the same x-coordinates.
+
+        Parameters
+        ----------
+        x : array-like
+            X-coordinates for the plot.
+        data_list : list of array-like
+            List of Y data arrays to plot.
+        labels : list of str, optional
+            Labels for each data array.
+        title : str, optional
+            Title of the plot.
+        xlabel : str, optional
+            Label for x-axis.
+        ylabel : str, optional
+            Label for y-axis.
+        """
+        # Cycle through line styles
+        line_styles = ['-', '--', ':','-.']
+    
+        plt.figure(figsize=(15, 5))
+
+        for i, y in enumerate(data_list):
+            label = labels[i] if labels and i < len(labels) else f"Line {i+1}"
+            line_i = i
+            while i >= len(line_styles):
+                line_i -= len(line_styles)
+            line_style = line_styles[line_i]
+            plt.plot(x, y, label=label,linestyle=line_style)
+
+        plt.xlabel(xlabel)
+        plt.ylabel(ylabel)
+        if title:
+            plt.title(title)
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        
+        # Save the plot to a BytesIO object
+        buffer = BytesIO()
+        plt.savefig(buffer, format='png',bbox_inches='tight')
+        buffer.seek(0)
+        
+        # Encode the image data as base64 string
+        base64_plot = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        
+        return base64_plot
+    
+    return _get_line_plot
+
 @pytest.fixture
 def get_pyvista_plot():
 
@@ -627,7 +681,7 @@ def pytest_runtest_makereport(item,call):
         if hasattr(item, 'screenshots'):
             img_tags = ''
             for screenshot in item.screenshots:
-                img_tags += "<td><img src='data:image/png;base64,{}' width='500'>></td>".format(screenshot)
+                img_tags += "<td><img src='data:image/png;base64,{}' >></td>".format(screenshot)
             extras.append(pytest_html.extras.html(f"<tr>{img_tags}</tr>"))
             
         report.extras = extras

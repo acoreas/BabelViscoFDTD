@@ -3,6 +3,33 @@ import numpy as np
 import pytest
 
 @pytest.fixture()
+def calc_axial_pressure():
+    def _calc_axial_pressure(x,p_medium,omega,c,u0,a,A,h):
+        '''
+        p_medium:   medium density
+        omega:      angular frequency
+        c:          propagation velocity
+        u0:         max normal velocity
+        a:          transducer width / 2
+        A:          transducer curvature radius
+        h:          concave surface depth
+        t:          time vector
+        '''
+        
+        k = omega / c
+        B = np.sqrt((x - h)**2 + a**2)
+        E = 2 / (1 - x/A)
+        delta = B - x
+        # M = (B + x) / 2
+        P = E * np.sin(k*delta/2)
+        
+        abs_axial_pressure = p_medium * c * u0 * np.abs(P)
+        
+        return abs_axial_pressure
+    
+    return _calc_axial_pressure
+
+@pytest.fixture()
 def bioheat_exact():
     def _calc_diffusivity_coeff(medium):
         # Calculate diffusivity from medium parameters
@@ -19,9 +46,9 @@ def bioheat_exact():
             
         return P
     
-    def _calc_heat_source(medium,source):
+    def _calc_heat_source(medium,heat_source):
         # calculate normalised heat source
-        S = source['Q'] / (medium['density'] * medium['specific_heat'])
+        S = heat_source / (medium['density'] * medium['specific_heat'])
         
         return S
         
@@ -245,20 +272,27 @@ def set_up_domain():
         
         return medium, medium_index
         
-    def _create_grid(grid_dims = [],grid_steps = []):
-        # Domain Dimensions
-        Lx, Ly, Lz = grid_dims
+    def _create_grid(grid_limits = [],grid_steps = []):
+        
+        # Get grid limits
+        if len(grid_limits) == 6:
+            xmin, xmax, ymin, ymax, zmin,zmax = grid_limits
+        elif len(grid_limits) == 3:
+            xmin = ymin = zmin = 0
+            xmax, ymax, zmax = grid_limits
+        else:
+            raise ValueError("invalid number of grid limit arguments given") 
         
         # Create computational grid
         dx, dy, dz = grid_steps
-        Nx = int(Lx//dx);       # number of grid points in the x (row) direction
-        Ny = int(Ly//dy);       # number of grid points in the y (column) direction
-        Nz = int(Lz//dz);       # number of grid points in the z direction
+        Nx = int(np.ceil((xmax-xmin)/dx)+1)       # number of grid points in the x (row) direction
+        Ny = int(np.ceil((ymax-ymin)/dy)+1)       # number of grid points in the y (column) direction
+        Nz = int(np.ceil((zmax-zmin)/dz)+1)       # number of grid points in the z direction
         
         # Create the 1D coordinates for each axis, centered around zero
-        x = np.linspace(-Lx/2, Lx/2 - dx, Nx, np.float64)
-        y = np.linspace(-Ly/2, Ly/2 - dy, Ny, np.float64)
-        z = np.linspace(-Lz/2, Lz/2 - dz, Nz, np.float64)
+        x = np.linspace(xmin, xmax, Nx, np.float64)
+        y = np.linspace(ymin, ymax, Ny, np.float64)
+        z = np.linspace(zmin, zmax, Nz, np.float64)
         
         # Create a meshgrid
         X, Y, Z = np.meshgrid(x, y, z, indexing='ij')  # 'ij' ensures (x,y,z) ordering

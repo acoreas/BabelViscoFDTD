@@ -13,7 +13,7 @@ if working_dir in sys.path:
     sys.path.remove(working_dir)
 
 # Grab BabelViscoFDTD from environment
-from BabelViscoFDTD.tools.RayleighAndBHTE import BHTE, InitCuda,InitOpenCL,InitMetal, InitMLX
+from BabelViscoFDTD.tools.RayleighAndBHTE import BHTE, ForwardSimple, InitCuda, InitOpenCL, InitMetal, InitMLX, GenerateSurface
 
 def test_BHTE_no_source(spatial_step,bioheat_exact,set_up_domain,compare_data,request,get_mpl_plot,computing_backend,get_gpu_device,tolerance):
     
@@ -23,7 +23,7 @@ def test_BHTE_no_source(spatial_step,bioheat_exact,set_up_domain,compare_data,re
 
     # Create grid
     create_grid = set_up_domain['grid']
-    X, Y, Z = create_grid(grid_dims = [128, 128, 128], grid_steps = 3*[spatial_step])
+    X, Y, Z = create_grid(grid_limits = [-64, 64, -64, 64, -64, 64], grid_steps = 3*[spatial_step])
     
     # Set homogeneous brain medium
     set_medium = set_up_domain['medium']
@@ -119,7 +119,7 @@ def test_BHTE_no_source_with_perfusion(spatial_step,set_up_domain,bioheat_exact,
 
     # Create grid
     create_grid = set_up_domain['grid']
-    X, Y, Z = create_grid(grid_dims = [128, 128, 128], grid_steps = 3*[spatial_step])
+    X, Y, Z = create_grid(grid_limits = [-64, 64, -64, 64, -64, 64], grid_steps = 3*[spatial_step])
     
     # Set homogeneous brain medium
     set_medium = set_up_domain['medium']
@@ -218,7 +218,7 @@ def test_BHTE_source_with_perfusion(spatial_step,set_up_domain,bioheat_exact,com
 
     # Create grid
     create_grid = set_up_domain['grid']
-    X, Y, Z = create_grid(grid_dims = [128, 128, 128], grid_steps = 3*[spatial_step])
+    X, Y, Z = create_grid(grid_limits = [-64, 64, -64, 64, -64, 64], grid_steps = 3*[spatial_step])
     
     # Set homogeneous brain medium
     set_medium = set_up_domain['medium']
@@ -251,7 +251,7 @@ def test_BHTE_source_with_perfusion(spatial_step,set_up_domain,bioheat_exact,com
     P = bioheat_exact['perfusion'](medium)
     
     # Calculate normalized heat source
-    S = bioheat_exact['heat_source'](medium,source)
+    S = bioheat_exact['heat_source'](medium,source['Q'])
     
     # Compute Green's function solution using bioheatExact
     t0  = time.perf_counter()
@@ -317,7 +317,264 @@ def test_BHTE_source_with_perfusion(spatial_step,set_up_domain,bioheat_exact,com
     dice_coeff = calc_dice_coeff(temp_exact,temp_babelvisco,rel_tolerance=tolerance)
     
     assert dice_coeff == pytest.approx(1.0, rel=1e-9), f"DICE score is not 1 ({dice_coeff})"
+
+@pytest.mark.parametrize(
+    "frequency, ppw",
+    [(2e5,6),(6e5,6),(1e6,6),(1e6,12)],
+    ids = ["low_res","med_res","high_res","stress_res"]
+)
+def test_ForwardSimple(frequency,ppw,set_up_domain,request,get_line_plot,computing_backend,get_gpu_device,calc_axial_pressure):
     
-pytest.mark.skip("Placeholder test")
-def test_BHTEMultiplePressureFields():
-    pass
+    # =========================================================================
+    # MEDIUM PROPERTIES
+    # =========================================================================
+    
+    lossless_medium = {"density":                1.000e3,    # kg/m^3
+                       "sos":                    1.500e3,    # m/s
+                       }
+    
+    # =========================================================================
+    # TRANSDUCER SETUP
+    # =========================================================================
+    
+    # Signal Parameters
+    wavelength = lossless_medium['sos'] / frequency
+    spatial_step = wavelength / ppw
+    amp = 60e3/lossless_medium['density']/lossless_medium['sos'] # 60 kPa
+    attenuation = 0
+    cwvnb_extlay=np.array(2*np.pi*frequency/lossless_medium['sos']+(-1j*attenuation)).astype(np.complex64)
+    logging.info(f"\nFrequency: {frequency*1e-3} kHz\nPPW: {ppw}\nSpatial step: {spatial_step} m")
+    
+    # Create circular transducer
+    tx_radius = 10 * wavelength
+    tx_diameter = tx_radius * 2
+    tx_focus = tx_radius * 4
+    tx = GenerateSurface(spatial_step,tx_diameter,tx_focus)
+    
+    tx['center'][:,2]-=np.min(tx['center'][:,2]) #we make the back of the bowl to be aligned at 0
+    tx['VertDisplay'][:,2]-=np.min(tx['VertDisplay'][:,2]) #we make the back of the bowl to be aligned at 0
+    
+    # =========================================================================
+    # DOMAIN SETUP
+    # =========================================================================
+
+    # Create grid
+    create_grid = set_up_domain['grid']
+    grid_radius = 1.5 * tx_radius
+    X, Y, Z = create_grid(grid_limits = [-grid_radius, grid_radius, -grid_radius, grid_radius, 0, 2*tx_focus], grid_steps = 3*[spatial_step])
+    
+    # =========================================================================
+    # CALCULATE AXIAL PRESSURE USING FORMULA
+    # =========================================================================
+    h = tx_focus - np.sqrt(tx_focus**2 - tx_radius**2)
+    
+    axial_coords = Z[Z.shape[0]//2,Z.shape[1]//2,:]
+    axial_pressure_truth = calc_axial_pressure(axial_coords,
+                                               p_medium=lossless_medium['density'],
+                                               omega=2*np.pi*frequency,
+                                               c = lossless_medium["sos"],
+                                               u0 = amp,
+                                               a = tx_radius,
+                                               A = tx_focus,
+                                               h = h)
+    
+    # =========================================================================
+    # RUN SIMULATION USING BABELVISCOFDTD'S FORWARDSIMPLE FUNCTION
+    # =========================================================================
+    
+    # Additional setup
+    rf=np.hstack((np.reshape(X,(np.prod(X.shape),1)),np.reshape(Y,(np.prod(Y.shape),1)), np.reshape(Z,(np.prod(Z.shape),1)))).astype(np.float32)
+    u0=np.ones((tx['center'].shape[0],1),np.float32)+ 1j*np.zeros((tx['center'].shape[0],1),np.float32)
+    u0*=amp
+
+    # Initialize GPU
+    gpu_device = get_gpu_device()
+    if computing_backend['type'] == "CUDA":
+        InitCuda(gpu_device)
+    elif computing_backend['type'] == "OpenCL":
+        InitOpenCL(gpu_device)
+    elif computing_backend['type'] == "Metal":
+        InitMetal(gpu_device)
+    elif computing_backend['type'] == "MLX":
+        InitMLX(gpu_device)
+    else:
+        raise ValueError("Not sure what computing backend was chosen")
+    
+    # Run BabelViscoFDTD's Rayleigh Integral solver
+    pressure_babelvisco = ForwardSimple(cwvnb_extlay,
+                                        center=tx['center'].astype(np.float32),
+                                        ds=tx['ds'].astype(np.float32),
+                                        u0=u0,
+                                        rf=rf,
+                                        deviceMetal=gpu_device)
+    
+    pressure_babelvisco=np.abs(np.reshape(pressure_babelvisco,X.shape)*lossless_medium['density']*lossless_medium['sos'])
+    axial_pressure_babelvisco = pressure_babelvisco[pressure_babelvisco.shape[0]//2,pressure_babelvisco.shape[1]//2,:]
+    
+    # =========================================================================
+    # RESULTS CLEANUP
+    # =========================================================================
+    
+    # Remove infinite values from results (Truth method will produce one at focal spot)
+    mask = np.isfinite(axial_pressure_truth) & np.isfinite(axial_pressure_babelvisco)
+    
+    axial_pressure_truth = axial_pressure_truth[mask]
+    axial_pressure_babelvisco = axial_pressure_babelvisco[mask]
+    axial_coords = axial_coords[mask]
+    
+    removed_elements_num = abs(len(axial_pressure_truth) - len(mask))
+    if removed_elements_num:
+        logging.info(f"Removed {removed_elements_num} inf values from results")
+    
+    logging.info(f"\nTruth max: {axial_pressure_truth.max()}\nTruth min: {axial_pressure_truth.min()}\nTruth mean: {axial_pressure_truth.mean()}")
+    logging.info(f"\nBabelViscoFDTD max: {axial_pressure_babelvisco.max()}\nBabelViscoFDTD min: {axial_pressure_babelvisco.min()}\nBabelViscoFDTD mean: {axial_pressure_babelvisco.mean()}")
+    
+    # =========================================================================
+    # VISUALISATION
+    # =========================================================================
+            
+    # Save plot screenshot to be added to html report later
+    request.node.screenshots = []
+    plots = [axial_pressure_truth,axial_pressure_babelvisco, abs(axial_pressure_babelvisco-axial_pressure_truth)]
+    plot_names = ["Truth", "BabelViscoFDTD", "Difference"]
+    screenshot = get_line_plot(axial_coords, data_list=plots, labels=plot_names, title = "Axial Pressure")
+    request.node.screenshots.append(screenshot)
+    
+    # =========================================================================
+    # COMPARISON
+    # =========================================================================
+    relative_L2_percent = 100.0 * np.sqrt(np.sum((axial_pressure_babelvisco - axial_pressure_truth)**2) / np.sum(axial_pressure_truth**2) )
+    logging.info(f"Relative L2: {relative_L2_percent}%")
+    
+    assert relative_L2_percent <= 1, f"Relative L2 is >1% ({relative_L2_percent}%)"
+
+@pytest.mark.parametrize(
+    "frequency",
+    [2e5,6e5,1e6],
+    ids = ["200kHz","600kHz","1000kHz"]
+)
+def test_ForwardSimple_low_res_failure(frequency,set_up_domain,request,get_line_plot,computing_backend,get_gpu_device,calc_axial_pressure):
+    
+    # =========================================================================
+    # MEDIUM PROPERTIES
+    # =========================================================================
+    
+    lossless_medium = {"density":                1.000e3,    # kg/m^3
+                       "sos":                    1.500e3,    # m/s
+                       }
+    
+    # =========================================================================
+    # TRANSDUCER SETUP
+    # =========================================================================
+    
+    # Signal Parameters
+    wavelength = lossless_medium['sos'] / frequency
+    ppw = 6
+    spatial_step = wavelength / ppw
+    amp = 60e3/lossless_medium['density']/lossless_medium['sos'] # 60 kPa
+    attenuation = 0
+    cwvnb_extlay=np.array(2*np.pi*frequency/lossless_medium['sos']+(-1j*attenuation)).astype(np.complex64)
+    logging.info(f"\nFrequency: {frequency*1e-3} kHz\nSpatial step: {spatial_step} m")
+    
+    # Create circular transducer
+    tx_radius = 10 * wavelength
+    tx_diameter = tx_radius * 2
+    tx_focus = tx_radius * 4
+    tx = GenerateSurface(wavelength,tx_diameter,tx_focus) # Make spatial step = wavelength
+    
+    tx['center'][:,2]-=np.min(tx['center'][:,2]) #we make the back of the bowl to be aligned at 0
+    tx['VertDisplay'][:,2]-=np.min(tx['VertDisplay'][:,2]) #we make the back of the bowl to be aligned at 0
+    
+    # =========================================================================
+    # DOMAIN SETUP
+    # =========================================================================
+
+    # Create grid
+    create_grid = set_up_domain['grid']
+    grid_radius = 1.5 * tx_radius
+    X, Y, Z = create_grid(grid_limits = [-grid_radius, grid_radius, -grid_radius, grid_radius, 0, 2*tx_focus], grid_steps = 3*[spatial_step])
+    
+    # =========================================================================
+    # CALCULATE AXIAL PRESSURE USING FORMULA
+    # =========================================================================
+    h = tx_focus - np.sqrt(tx_focus**2 - tx_radius**2)
+    
+    axial_coords = Z[Z.shape[0]//2,Z.shape[1]//2,:]
+    axial_pressure_truth = calc_axial_pressure(axial_coords,
+                                               p_medium=lossless_medium['density'],
+                                               omega=2*np.pi*frequency,
+                                               c = lossless_medium["sos"],
+                                               u0 = amp,
+                                               a = tx_radius,
+                                               A = tx_focus,
+                                               h = h)
+    
+    # =========================================================================
+    # RUN SIMULATION USING BABELVISCOFDTD'S FORWARDSIMPLE FUNCTION
+    # =========================================================================
+    
+    # Additional setup
+    rf=np.hstack((np.reshape(X,(np.prod(X.shape),1)),np.reshape(Y,(np.prod(Y.shape),1)), np.reshape(Z,(np.prod(Z.shape),1)))).astype(np.float32)
+    u0=np.ones((tx['center'].shape[0],1),np.float32)+ 1j*np.zeros((tx['center'].shape[0],1),np.float32)
+    u0*=amp
+
+    # Initialize GPU
+    gpu_device = get_gpu_device()
+    if computing_backend['type'] == "CUDA":
+        InitCuda(gpu_device)
+    elif computing_backend['type'] == "OpenCL":
+        InitOpenCL(gpu_device)
+    elif computing_backend['type'] == "Metal":
+        InitMetal(gpu_device)
+    elif computing_backend['type'] == "MLX":
+        InitMLX(gpu_device)
+    else:
+        raise ValueError("Not sure what computing backend was chosen")
+    
+    # Run BabelViscoFDTD's Rayleigh Integral solver
+    pressure_babelvisco = ForwardSimple(cwvnb_extlay,
+                                        center=tx['center'].astype(np.float32),
+                                        ds=tx['ds'].astype(np.float32),
+                                        u0=u0,
+                                        rf=rf,
+                                        deviceMetal=gpu_device)
+    
+    pressure_babelvisco=np.abs(np.reshape(pressure_babelvisco,X.shape)*lossless_medium['density']*lossless_medium['sos'])
+    axial_pressure_babelvisco = pressure_babelvisco[pressure_babelvisco.shape[0]//2,pressure_babelvisco.shape[1]//2,:]
+    
+    # =========================================================================
+    # RESULTS CLEANUP
+    # =========================================================================
+    
+    # Remove infinite values from results (Truth method will produce one at focal spot)
+    mask = np.isfinite(axial_pressure_truth) & np.isfinite(axial_pressure_babelvisco)
+    
+    axial_pressure_truth = axial_pressure_truth[mask]
+    axial_pressure_babelvisco = axial_pressure_babelvisco[mask]
+    axial_coords = axial_coords[mask]
+    
+    removed_elements_num = abs(len(axial_pressure_truth) - len(mask))
+    if removed_elements_num:
+        logging.info(f"Removed {removed_elements_num} inf values from results")
+    
+    logging.info(f"\nTruth max: {axial_pressure_truth.max()}\nTruth min: {axial_pressure_truth.min()}\nTruth mean: {axial_pressure_truth.mean()}")
+    logging.info(f"\nBabelViscoFDTD max: {axial_pressure_babelvisco.max()}\nBabelViscoFDTD min: {axial_pressure_babelvisco.min()}\nBabelViscoFDTD mean: {axial_pressure_babelvisco.mean()}")
+    
+    # =========================================================================
+    # VISUALISATION
+    # =========================================================================
+            
+    # Save plot screenshot to be added to html report later
+    request.node.screenshots = []
+    plots = [axial_pressure_truth,axial_pressure_babelvisco, abs(axial_pressure_babelvisco-axial_pressure_truth)]
+    plot_names = ["Truth", "BabelViscoFDTD", "Difference"]
+    screenshot = get_line_plot(axial_coords, data_list=plots, labels=plot_names, title = "Axial Pressure")
+    request.node.screenshots.append(screenshot)
+    
+    # =========================================================================
+    # COMPARISON
+    # =========================================================================
+    relative_L2_percent = 100.0 * np.sqrt(np.sum((axial_pressure_babelvisco - axial_pressure_truth)**2) / np.sum(axial_pressure_truth**2) )
+    logging.info(f"Relative L2: {relative_L2_percent}%")
+    
+    assert relative_L2_percent > 1, f"We expected BabelViscoFDTD's rayleigh solver to fail due to a low spatial step (~size of lambda), however it produced similar resuts to truth method"
