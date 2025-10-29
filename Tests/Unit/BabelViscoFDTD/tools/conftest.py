@@ -220,85 +220,27 @@ def bioheat_exact():
             'heat_source': _calc_heat_source}
 
 @pytest.fixture()
-def set_up_domain():
-    def _get_material_list():
+def set_up_domain(set_up_domain):
+    def _new_get_material_list_bhte():
         MaterialList = {}                 #Water    #Water      #Blood      #Brain
         MaterialList['Density']         = [1000.0,  1000.0,     1050.0,     1041.0]     # (kg/m3)
         MaterialList['SoS']             = [1500.0,  1500.0,     1570.0,     1562.0]     # (m/s)
-        MaterialList['Attenuation']     = [0.0,     0.0,        0.0,        np.inf]     # Normally use 3.45 (@500kHz) for Brain
+        MaterialList['Attenuation']     = [0.0,     0.0,        0.0,        np.inf]     # (Np/m)
         MaterialList['SpecificHeat']    = [4178.0,  4178.0,     3617.0,     3630.0]     # (J/kg/°C)
         MaterialList['Conductivity']    = [0.6,     0.6,        0.52,       0.51]       # (W/m/°C)
         MaterialList['Perfusion']       = [0.0,     0.0,        10000.0,    559.0]      # (ml/min/kg)
-        MaterialList['Absorption']      = [0.0,     0.0,        0.0,        1.0]        # Normally use 0.85 for Brain
+        MaterialList['Absorption']      = [0.0,     0.0,        0.0,        1.0]        # Unitless
         MaterialList['InitTemperature'] = [37.0,    37.0,       37.0,       37.0]       # (°C)
         # Water material is duplicated since metal compute sims run into issues when
         # trying to run in homogenous material (like water) and its properties are stored in index 0
         
         # We chose new values for attenuation and absorption values for brain to essentially remove them from
         # babelvisco's BHTE heat disposition calculation since they aren't included in the truth method's calculation
+        
+        material_indices = {"Water": 1, "Blood": 2, "Brain":3}
+        
+        return MaterialList, material_indices
     
-        return MaterialList
-
-    def _set_medium(medium_type='brain'):
-        
-        # Indices for materials
-        blood_index = 2
-        if medium_type == "water":
-            medium_index = 1
-        elif medium_type == "blood":
-            medium_index = 2
-        elif medium_type == "brain":
-            medium_index = 3
-        else:
-            raise ValueError("Invalid medium_type provided")
-        
-        # Define medium properties
-        medium = {}
-        MaterialList = _get_material_list()
-        # Medium properties specific to diffusion
-        medium['density']               = MaterialList['Density'][medium_index]
-        medium['thermal_conductivity']  = MaterialList['Conductivity'][medium_index]
-        medium['specific_heat']         = MaterialList['SpecificHeat'][medium_index]
-        # Blood properties specific to perfusion
-        medium['blood_density']             = MaterialList['Density'][blood_index]
-        medium['blood_specific_heat']       = MaterialList['SpecificHeat'][blood_index]
-        medium['blood_perfusion_rate']      = MaterialList['Perfusion'][medium_index]*(1/60)*(1e-6)*medium['density'] # Need units in 1/s for truth method
-        medium['blood_ambient_temperature'] = MaterialList['InitTemperature'][blood_index]
-        # Medium properties specific to heat disposition
-        medium['sos'] = MaterialList['SoS'][medium_index]
-        medium['attenuation'] = MaterialList['Attenuation'][medium_index]
-        medium['absorption'] = MaterialList['Absorption'][medium_index]
-        logging.info(medium)
-        
-        return medium, medium_index
-        
-    def _create_grid(grid_limits = [],grid_steps = []):
-        
-        # Get grid limits
-        if len(grid_limits) == 6:
-            xmin, xmax, ymin, ymax, zmin,zmax = grid_limits
-        elif len(grid_limits) == 3:
-            xmin = ymin = zmin = 0
-            xmax, ymax, zmax = grid_limits
-        else:
-            raise ValueError("invalid number of grid limit arguments given") 
-        
-        # Create computational grid
-        dx, dy, dz = grid_steps
-        Nx = int(np.ceil((xmax-xmin)/dx)+1)       # number of grid points in the x (row) direction
-        Ny = int(np.ceil((ymax-ymin)/dy)+1)       # number of grid points in the y (column) direction
-        Nz = int(np.ceil((zmax-zmin)/dz)+1)       # number of grid points in the z direction
-        
-        # Create the 1D coordinates for each axis, centered around zero
-        x = np.linspace(xmin, xmax, Nx, np.float64)
-        y = np.linspace(ymin, ymax, Ny, np.float64)
-        z = np.linspace(zmin, zmax, Nz, np.float64)
-        
-        # Create a meshgrid
-        X, Y, Z = np.meshgrid(x, y, z, indexing='ij')  # 'ij' ensures (x,y,z) ordering
-        
-        return X,Y,Z
-        
-    return {'grid': _create_grid,
-            'medium': _set_medium,
-            'material_list': _get_material_list}
+    set_up_domain['material_list_bhte'] = _new_get_material_list_bhte
+    return set_up_domain
+    

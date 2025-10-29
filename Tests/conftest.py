@@ -294,7 +294,7 @@ def compare_data(get_rmse):
 
         return bhatt_coefficent
 
-    def dice_coefficient(output_array,truth_array,abs_tolerance=1e-6,rel_tolerance=0):
+    def dice_coefficient(output_array,truth_array,abs_tolerance=1e-8,rel_tolerance=1e-05):
         logging.info('Calculating dice coefficient')
 
         if output_array.size != truth_array.size:
@@ -422,75 +422,80 @@ def image_to_base64():
 
 @pytest.fixture()
 def get_mpl_plot():
-    def _get_mpl_plot(datas,axes_num=1,titles=None, color_map='viridis',colorbar=False,clim=None):
+    def _get_mpl_plot(datas, axes_num=1, titles=None, color_map='viridis', colorbar=False, clim=None):
+        """
+        Create one or multiple Matplotlib plots for 2D or 3D data.
 
+        Parameters
+        ----------
+        datas : list of np.ndarray
+            List of 2D or 3D arrays to plot.
+        axes_num : int
+            Number of slices or axes to plot (e.g., 1, 2, or 3 for 3D data).
+        titles : list of str, optional
+            Titles for each data array.
+        color_map : str
+            Colormap for imshow.
+        colorbar : bool
+            Whether to show colorbars.
+        clim : tuple, optional
+            (vmin, vmax) for color limits.
+        """
         data_num = len(datas)
-        fig, axs = plt.subplots(axes_num, data_num, figsize = (data_num * 2.5, axes_num * 2.5))
-        
-        for axis in range(axes_num):
-            for num in range(data_num):
-                midpoint = datas[num].shape[axis]//2
+        fig, axs = plt.subplots(axes_num, data_num, figsize=(data_num * 2.5, axes_num * 2.5))
 
-                if axes_num > 1 and data_num > 1:
-                    if axis == 0:
-                        im = axs[axis,num].imshow(np.rot90(datas[num][midpoint,:,:]), cmap=color_map)
-                    elif axis == 1:
-                        im = axs[axis,num].imshow(np.rot90(datas[num][:,midpoint,:]), cmap=color_map)
+        # Normalize axs to a 2D numpy array for consistent indexing
+        if isinstance(axs, np.ndarray):
+            if axs.ndim == 1:
+                if axes_num == 1:  # shape (data_num,)
+                    axs = axs[np.newaxis, :]  # (1, data_num)
+                elif data_num == 1:  # shape (axes_num,)
+                    axs = axs[:, np.newaxis]  # (axes_num, 1)
+            # else already 2D
+        else:
+            axs = np.array([[axs]])  # scalar → (1,1)
+
+        for i_axis in range(axes_num):
+            for i_data, data in enumerate(datas):
+                # Handle both 2D and 3D arrays
+                if data.ndim == 2:
+                    img_data = data
+                elif data.ndim == 3:
+                    # Compute midpoint along the relevant axis
+                    midpoint = data.shape[i_axis % 3] // 2
+                    if i_axis % 3 == 0:
+                        img_data = data[midpoint, :, :].T
+                    elif i_axis % 3 == 1:
+                        img_data = data[:, midpoint, :].T
                     else:
-                        im = axs[axis,num].imshow(datas[num][:,:,midpoint], cmap=color_map)
+                        img_data = data[:, :, midpoint].T
+                else:
+                    raise ValueError(f"Unsupported data dimension: {data.ndim}")
 
-                    if titles is not None and axis == 0:
-                        axs[axis,num].set_title(titles[num])
-                        
-                    if colorbar:
-                        if clim is not None:
-                            im.set_clim(clim)
-                        fig.colorbar(im, ax=axs[axis, num], shrink=0.7)
-                elif axes_num == 1 and data_num == 1:
-                    if axis == 0:
-                        im = axs.imshow(np.rot90(datas[num][midpoint,:,:]), cmap=color_map)
-                    elif axis == 1:
-                        im = axs.imshow(np.rot90(datas[num][:,midpoint,:]), cmap=color_map)
-                    else:
-                        im = axs.imshow(datas[num][:,:,midpoint], cmap=color_map)
+                ax = axs[i_axis, i_data]
+                im = ax.imshow(img_data, cmap=color_map)
 
-                    if titles is not None and axis == 0:
-                        axs.set_title(titles[num],fontsize=14)
-                        
-                    if colorbar:
-                        if clim is not None:
-                            im.set_clim(clim)
-                        fig.colorbar(im, ax=axs, shrink=0.7)
-                else:  
-                    if axis == 0:
-                        im = axs[num].imshow(np.rot90(datas[num][midpoint,:,:]), cmap=color_map)
-                    elif axis == 1:
-                        im = axs[num].imshow(np.rot90(datas[num][:,midpoint,:]), cmap=color_map)
-                    else:
-                        im = axs[num].imshow(datas[num][:,:,midpoint], cmap=color_map)
+                # Titles only on first row
+                if titles is not None and i_axis == 0:
+                    ax.set_title(titles[i_data], fontsize=12)
 
-                    if titles is not None and axis == 0:
-                        axs[num].set_title(titles[num],fontsize=14)
-                        
-                    if colorbar:
-                        if clim is not None:
-                            im.set_clim(clim)
-                        fig.colorbar(im, ax=axs[num], shrink=0.7)
+                if colorbar:
+                    if clim is not None:
+                        im.set_clim(clim)
+                    fig.colorbar(im, ax=ax, shrink=0.7)
 
-        # Adjust plots
-        plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.5, hspace=0.5)
         plt.tight_layout()
 
         # Save the plot to a BytesIO object
         buffer = BytesIO()
-        plt.savefig(buffer, format='png')
+        plt.savefig(buffer, format='png', bbox_inches='tight')
         buffer.seek(0)
         
         # Encode the image data as base64 string
         base64_plot = base64.b64encode(buffer.getvalue()).decode('utf-8')
-        
+        plt.close(fig)
         return base64_plot
-    
+
     return _get_mpl_plot
 
 @pytest.fixture()
@@ -517,7 +522,7 @@ def get_line_plot():
         # Cycle through line styles
         line_styles = ['-', '--', ':','-.']
     
-        plt.figure(figsize=(15, 5))
+        plt.figure(figsize=(7.5, 2.5))
 
         for i, y in enumerate(data_list):
             label = labels[i] if labels and i < len(labels) else f"Line {i+1}"

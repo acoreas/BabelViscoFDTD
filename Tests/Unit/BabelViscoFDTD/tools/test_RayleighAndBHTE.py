@@ -26,7 +26,7 @@ def test_BHTE_no_source(spatial_step,bioheat_exact,set_up_domain,compare_data,re
     X, Y, Z = create_grid(grid_limits = [-64, 64, -64, 64, -64, 64], grid_steps = 3*[spatial_step])
     
     # Set homogeneous brain medium
-    set_medium = set_up_domain['medium']
+    set_medium = set_up_domain['medium_bhte']
     medium, medium_index = set_medium(medium_type='water')
     
     # Set Gaussian initial temperature distribution [degC]
@@ -59,7 +59,7 @@ def test_BHTE_no_source(spatial_step,bioheat_exact,set_up_domain,compare_data,re
     nFactorMonitoring=int(2.5/dt) # Monitor every 2.5s
     pressure = np.zeros_like(source['T0'])
     MaterialMap = medium_index * np.ones_like(source['T0'],dtype=np.uint32)
-    MaterialList = set_up_domain['material_list']()
+    MaterialList,_ = set_up_domain['material_list_bhte']()
     
     # Initialize GPU
     gpu_device = get_gpu_device()
@@ -122,7 +122,7 @@ def test_BHTE_no_source_with_perfusion(spatial_step,set_up_domain,bioheat_exact,
     X, Y, Z = create_grid(grid_limits = [-64, 64, -64, 64, -64, 64], grid_steps = 3*[spatial_step])
     
     # Set homogeneous brain medium
-    set_medium = set_up_domain['medium']
+    set_medium = set_up_domain['medium_bhte']
     medium, medium_index = set_medium(medium_type='brain')
     
     # Set Gaussian initial temperature distribution [degC]
@@ -158,7 +158,7 @@ def test_BHTE_no_source_with_perfusion(spatial_step,set_up_domain,bioheat_exact,
     nFactorMonitoring=int(2.5/dt) # Monitor every 2.5s
     pressure = np.zeros_like(source['T0'])
     MaterialMap = medium_index * np.ones_like(source['T0'],dtype=np.uint32)
-    MaterialList = set_up_domain['material_list']()
+    MaterialList,_ = set_up_domain['material_list_bhte']()
     
     # Initialize GPU
     gpu_device = get_gpu_device()
@@ -221,7 +221,7 @@ def test_BHTE_source_with_perfusion(spatial_step,set_up_domain,bioheat_exact,com
     X, Y, Z = create_grid(grid_limits = [-64, 64, -64, 64, -64, 64], grid_steps = 3*[spatial_step])
     
     # Set homogeneous brain medium
-    set_medium = set_up_domain['medium']
+    set_medium = set_up_domain['medium_bhte']
     medium, medium_index = set_medium(medium_type='brain')
     
     # Set initial temperature distribution to be constant [degC]
@@ -266,7 +266,7 @@ def test_BHTE_source_with_perfusion(spatial_step,set_up_domain,bioheat_exact,com
     # BHTE parameters
     nFactorMonitoring=int(2.5/dt) # Monitor every 2.5s
     MaterialMap = medium_index * np.ones_like(source['T0'],dtype=np.uint32)
-    MaterialList = set_up_domain['material_list']()
+    MaterialList,_ = set_up_domain['material_list_bhte']()
     
     # Initialize GPU
     gpu_device = get_gpu_device()
