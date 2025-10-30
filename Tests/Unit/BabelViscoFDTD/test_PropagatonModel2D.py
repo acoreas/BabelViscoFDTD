@@ -22,7 +22,7 @@ def test_PropagationModel2D_vs_CPU(frequency,ppw,computing_backend,get_gpu_devic
     request.node.screenshots = []
     
     # CPU truth file name
-    truth_file = os.path.join(os.getcwd(),f"Tests/Test_Data/PropagationModel2D_CPU_{int(frequency/1e3)}kHz_{ppw}PPW_{computing_backend['type']}")
+    truth_file = os.path.join(os.getcwd(),f"Tests/Test_Data/PropagationModel2D_CPU_{int(frequency/1e3)}kHz_{ppw}PPW")
     
     # =============================================================================
     # PROPAGATIONMODEL SETUP
