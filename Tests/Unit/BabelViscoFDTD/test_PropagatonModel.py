@@ -20,11 +20,13 @@ from BabelViscoFDTD.PropagationModel import PropagationModel
     [(2e5,6),(6e5,6),(1e6,6),(1e6,12)],
     ids = ["low_res","med_res","high_res","stress_res"]
 )
-def test_PropagationModel_vs_CPU(frequency,ppw,computing_backend,get_gpu_device,setup_propagation_model,request,get_mpl_plot,get_line_plot,compare_data,load_files):
+def test_PropagationModel_vs_CPU(frequency,ppw,computing_backend,get_gpu_device,setup_propagation_model,request,get_mpl_plot,get_line_plot,compare_data):
 
     # Save plot screenshots to be added to html report later
     request.node.screenshots = []
-    truth_file = os.path.join(os.getcwd(),f"Tests/Test_Data/PropagationModel_CPU_{int(frequency/1e3)}kHz_{ppw}PPW_{computing_backend['type']}.npy")
+    
+    # CPU truth file name
+    truth_file = os.path.join(os.getcwd(),f"Tests/Test_Data/PropagationModel_CPU_{int(frequency/1e3)}kHz_{ppw}PPW_{computing_backend['type']}")
         
     # =============================================================================
     # PROPAGATIONMODEL SETUP
@@ -43,7 +45,7 @@ def test_PropagationModel_vs_CPU(frequency,ppw,computing_backend,get_gpu_device,
     
     # Additional setup
     results_type = 3 # Return RMS Data (1), Peak Data (2), or both (3)
-    results_outputs = ['Pressure'] # ['Vx','Vy','Vz','Pressure','Sigmaxx','Sigmayy', 'Sigmazz','Sigmaxy','Sigmaxz','Sigmayz']
+    results_outputs = ['Vx','Vy','Vz','Pressure','Sigmaxx','Sigmayy', 'Sigmazz','Sigmaxy','Sigmaxz','Sigmayz']
     sensor_outputs = ['Pressure','Vx','Vy','Vz','Sigmaxx','Sigmayy', 'Sigmazz','Sigmaxy','Sigmaxz','Sigmayz']
     
     computing_backend_index = 0 # default to CPU
@@ -90,6 +92,13 @@ def test_PropagationModel_vs_CPU(frequency,ppw,computing_backend,get_gpu_device,
     # =============================================================================
     # RUN PROPAGATIONMODEL USING CPU
     # =============================================================================
+    if results_type == 1:
+        results_type_str = "RMS"
+    elif results_type == 2:
+        results_type_str = "Peak"
+    else:
+        results_type_str = "RMS_Peak"
+    truth_file += f"_{len(results_outputs)}_{results_type_str}_results.npy"
     
     try:
         logging.info('Reloading CPU truth')
@@ -171,16 +180,18 @@ def test_PropagationModel_vs_CPU(frequency,ppw,computing_backend,get_gpu_device,
     total_dice_coeff = []
     
     for output in results_outputs:
-        if results_type == 1 or results_type == 3:
+        logging.info(f"\nComparing {output}")
+        if results_type == 3:
             dice_coeff = calc_dice_coeff(rms_results_cpu_dict[output],rms_results_gpu_dict[output])
             total_dice_coeff.append(dice_coeff)
-        
-        if results_type == 2 or results_type == 3:
             dice_coeff = calc_dice_coeff(peak_results_cpu_dict[output],peak_results_gpu_dict[output])
+            total_dice_coeff.append(dice_coeff)
+        else:
+            dice_coeff = calc_dice_coeff(rmsorpeak_results_cpu_dict[output],rmsorpeak_results_gpu_dict[output])
             total_dice_coeff.append(dice_coeff)
 
     final_dice_coeff = np.mean(total_dice_coeff)
     
-    assert final_dice_coeff == pytest.approx(1.0, rel=1e-9), f"DICE coefficient is not 1"
+    assert final_dice_coeff == pytest.approx(1.0, rel=1e-9), f"Average DICE coefficient is not 1"
     
     
