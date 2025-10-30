@@ -16,11 +16,6 @@ if working_dir in sys.path:
 from BabelViscoFDTD.PropagationModel2D import PropagationModel2D
 
 @pytest.mark.skip("CPU backend for 2D sims is not yet supported")
-@pytest.mark.parametrize(
-    "frequency, ppw",
-    [(2e5,6),(6e5,6),(1e6,6),(1e6,12)],
-    ids = ["low_res","med_res","high_res","stress_res"]
-)
 def test_PropagationModel2D_vs_CPU(frequency,ppw,computing_backend,get_gpu_device,request,setup_propagation_model,get_line_plot,get_mpl_plot,compare_data):
     
     # Save plot screenshots to be added to html report later
@@ -159,8 +154,10 @@ def test_PropagationModel2D_vs_CPU(frequency,ppw,computing_backend,get_gpu_devic
             
             outputs.append(output_type_data[0][output_key])
             outputs.append(output_type_data[1][output_key])
+            outputs.append(abs(output_type_data[0][output_key]-output_type_data[1][output_key]))
             titles.append(f"{output_type_key} {output_key} - CPU")
             titles.append(f"{output_type_key} {output_key} - GPU")
+            titles.append(f"{output_type_key} {output_key} - Difference")
           
             if output_type_key == 'Sensor':
                 for i in range(len(outputs)):

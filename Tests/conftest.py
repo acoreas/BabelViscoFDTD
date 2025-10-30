@@ -56,6 +56,12 @@ spatial_step = {
     'High_Res': 0.184,  # 1000 kHz,  6 PPW
     'Stress_Res': 0.092,  # 1000 kHz, 12 PPW
 }
+freq_ppw = {
+    'Low_Res': [200e3, 6],
+    'Med_Res': [600e3, 6],
+    'High_Res': [1000e3, 6],
+    'Stress_Res': [1000e3,12]
+}
 
 # ================================================================================================================================
 # PYTEST FIXTURES
@@ -442,7 +448,7 @@ def get_mpl_plot():
             (vmin, vmax) for color limits.
         """
         data_num = len(datas)
-        fig, axs = plt.subplots(axes_num, data_num, figsize=(data_num * 2.5, axes_num * 2.5))
+        fig, axs = plt.subplots(axes_num, data_num, figsize=(data_num * 2.5, axes_num * 2.5),constrained_layout=True)
 
         # Normalize axs to a 2D numpy array for consistent indexing
         if isinstance(axs, np.ndarray):
@@ -482,9 +488,7 @@ def get_mpl_plot():
                 if colorbar:
                     if clim is not None:
                         im.set_clim(clim)
-                    fig.colorbar(im, ax=ax, shrink=0.7)
-
-        plt.tight_layout()
+                    fig.colorbar(im, ax=ax, shrink=0.9)
 
         # Save the plot to a BytesIO object
         buffer = BytesIO()
@@ -667,6 +671,20 @@ def pytest_generate_tests(metafunc):
             else:
                 params.append(pytest.param(ss_value, id=ss_key))
         metafunc.parametrize('spatial_step',params)
+    elif 'frequency' in metafunc.fixturenames and 'ppw' in metafunc.fixturenames:
+        params = []
+        for key,value in freq_ppw.items():
+            if "low" in key.lower():
+                params.append(pytest.param(value[0],value[1], id=key, marks=pytest.mark.low_res))
+            elif "med" in key.lower():
+                params.append(pytest.param(value[0],value[1], id=key, marks=pytest.mark.medium_res))
+            elif "high" in key.lower():
+                params.append(pytest.param(value[0],value[1], id=key, marks=[pytest.mark.slow,pytest.mark.high_res]))
+            elif "stress" in key.lower():
+                params.append(pytest.param(value[0],value[1], id=key, marks=[pytest.mark.slow,pytest.mark.stress_res]))
+            else:
+                params.append(pytest.param(value[0],value[1], id=key))
+        metafunc.parametrize('frequency,ppw',params)
         
     if 'tolerance' in metafunc.fixturenames:
         metafunc.parametrize('tolerance',

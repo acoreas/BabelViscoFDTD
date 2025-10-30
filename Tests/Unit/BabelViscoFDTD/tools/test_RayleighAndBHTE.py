@@ -318,11 +318,6 @@ def test_BHTE_source_with_perfusion(spatial_step,set_up_domain,bioheat_exact,com
     
     assert dice_coeff == pytest.approx(1.0, rel=1e-9), f"DICE score is not 1 ({dice_coeff})"
 
-@pytest.mark.parametrize(
-    "frequency, ppw",
-    [(2e5,6),(6e5,6),(1e6,6),(1e6,12)],
-    ids = ["low_res","med_res","high_res","stress_res"]
-)
 def test_ForwardSimple(frequency,ppw,set_up_domain,request,get_line_plot,computing_backend,get_gpu_device,calc_axial_pressure):
     
     # =========================================================================
