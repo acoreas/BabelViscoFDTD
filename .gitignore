@@ -286,3 +286,4 @@ Tutorial Notebooks/2D/.ipynb_checkpoints/1 - Basis of operation and flat source 
 BabelViscoFDTD/_gpu_kernel2D.c
 Pytest_Reports/
 Tests/Test_Data/
+Tests/Generate_Outputs/Generated_Outputs/
