@@ -1,5 +1,7 @@
+import glob
 import logging
 import os
+import re
 import sys
 import time
 
@@ -191,4 +193,162 @@ def test_PropagationModel_vs_CPU(frequency,ppw,computing_backend,get_gpu_device,
     
     assert final_dice_coeff == pytest.approx(1.0, rel=1e-9), f"Average DICE coefficient is not 1"
     
+def test_PropagationModel_regression(frequency,ppw,computing_backend,get_gpu_device,setup_propagation_model,request,get_mpl_plot,get_line_plot,compare_data,get_config_dirs,load_files):
+
+    # =============================================================================
+    # Test Setup
+    # =============================================================================
     
+    config_dirs = get_config_dirs
+    ref_dir = config_dirs['ref_dir_1']
+    
+    # Save plot screenshots to be added to html report later
+    request.node.screenshots = []
+    
+    # Reference file name
+    ref_file = os.path.join(ref_dir,f"PropagationModel_{computing_backend['type']}_{int(frequency/1e3)}kHz_{ppw}PPW")
+    
+    # =============================================================================
+    # PROPAGATIONMODEL SETUP
+    # =============================================================================
+    
+    # Current system GPU device
+    gpu_device = get_gpu_device()
+    
+    # Create propagation model and get parameters necessary for the sim
+    propagation_model = PropagationModel()
+    pmodel_params = setup_propagation_model(us_frequency=frequency,points_per_wavelength=ppw)
+    
+    # =============================================================================
+    # RUN PROPAGATIONMODEL USING GPU
+    # =============================================================================
+    
+    # Additional setup
+    results_type = 3 # Return RMS Data (1), Peak Data (2), or both (3)
+    results_outputs = ['Vx','Vy','Vz','Pressure','Sigmaxx','Sigmayy', 'Sigmazz','Sigmaxy','Sigmaxz','Sigmayz']
+    sensor_outputs = ['Pressure','Vx','Vy','Vz','Sigmaxx','Sigmayy', 'Sigmazz','Sigmaxy','Sigmaxz','Sigmayz']
+    
+    computing_backend_index = 0 # default to CPU
+    if computing_backend['type'] == 'CUDA':
+        computing_backend_index = 1
+    elif computing_backend['type'] == 'OpenCL':
+        computing_backend_index = 2 
+    elif computing_backend['type'] == 'Metal':
+        computing_backend_index = 3
+    elif computing_backend['type'] == 'MLX':
+        computing_backend_index = 4
+    else:
+        raise ValueError("Invalid computing_backend specified")
+    
+    test_results = propagation_model.StaggeredFDTD_3D_with_relaxation(MaterialMap = pmodel_params['material_map'],
+                                                                     MaterialProperties = pmodel_params['material_list'],
+                                                                     Frequency = frequency,
+                                                                     SourceMap = pmodel_params['source_map'],
+                                                                     SourceFunctions = pmodel_params['pulse_source'],
+                                                                     SpatialStep = pmodel_params['spatial_step'],
+                                                                     DurationSimulation = pmodel_params['sim_time'],
+                                                                     SensorMap = pmodel_params['sensor_map'],
+                                                                     Ox = pmodel_params['Ox'],
+                                                                     Oy = pmodel_params['Oy'],
+                                                                     Oz = pmodel_params['Oz'],
+                                                                     NDelta = pmodel_params['pml_thickness'],
+                                                                     ReflectionLimit = pmodel_params['reflection_limit'],
+                                                                     COMPUTING_BACKEND = computing_backend_index,
+                                                                     USE_SINGLE = True,
+                                                                     DT = pmodel_params['dt'],
+                                                                     QfactorCorrection = True,
+                                                                     SelRMSorPeak = results_type,
+                                                                     SelMapsRMSPeakList = results_outputs,
+                                                                     SelMapsSensorsList = sensor_outputs,
+                                                                     SensorSubSampling = pmodel_params['sensor_steps'],
+                                                                     DefaultGPUDeviceName = gpu_device,
+                                                                     TypeSource=0)
+    
+    if results_type == 3:
+        test_sensor_results_dict,test_last_map_dict,test_rms_results_dict,test_peak_results_dict,test_input_params = test_results
+    else:
+        test_sensor_results_dict,test_last_map_dict,test_rmsorpeak_results_dict,test_input_params = test_results
+    
+    # =============================================================================
+    # LOAD REFERENCE RESULTS
+    # =============================================================================
+    
+    # Load reference file
+    logging.info('Reloading Reference results')
+    if results_type == 1:
+        results_type_str = "RMS"
+    elif results_type == 2:
+        results_type_str = "Peak"
+    else:
+        results_type_str = "RMS_Peak"
+    ref_file += f"_{len(results_outputs)}_{results_type_str}_results.npy"
+    try:
+        ref_results = np.load(ref_file, allow_pickle=True)
+    except:
+        ref_file = re.sub(f"_{computing_backend['type']}","**",ref_file)
+        alt_ref_file = glob.glob(ref_file,recursive=True)[0]
+        ref_results = np.load(alt_ref_file, allow_pickle=True)
+    
+    # Unpack results
+    if results_type == 3:
+        ref_sensor_results_dict,ref_last_map_dict,ref_rms_results_dict,ref_peak_results_dict,ref_input_params = ref_results
+    else:
+        ref_sensor_results_dict,ref_last_map_dict,ref_rmsorpeak_results_dict,ref_input_params = ref_results
+    
+    # =============================================================================
+    # VISUALISATION
+    # =============================================================================
+    output_types = {'Sensor': [ref_sensor_results_dict, test_sensor_results_dict]}
+    if results_type == 1:
+        output_types['RMS'] = [ref_rmsorpeak_results_dict, test_rmsorpeak_results_dict]
+    elif results_type == 2:
+        output_types['Peak'] = [ref_rmsorpeak_results_dict, test_rmsorpeak_results_dict]
+    else:
+        output_types['RMS']  = [ref_rms_results_dict, test_rms_results_dict]
+        output_types['Peak'] = [ref_peak_results_dict, test_peak_results_dict]
+    
+    for output_type_key,output_type_data in output_types.items():
+        for output_key in output_type_data[0].keys():
+            outputs = []
+            titles = []
+            
+            if output_key == 'time':
+                continue
+            
+            outputs.append(output_type_data[0][output_key])
+            outputs.append(output_type_data[1][output_key])
+            outputs.append(abs(output_type_data[0][output_key]-output_type_data[1][output_key]))
+            titles.append(f"{output_type_key} {output_key} - CPU")
+            titles.append(f"{output_type_key} {output_key} - GPU")
+            titles.append(f"{output_type_key} {output_key} - Difference")
+          
+            if output_type_key == 'Sensor':
+                for i in range(len(outputs)):
+                    outputs[i] = outputs[i][outputs[i].shape[0]//2,:] # Use halfway time point
+                screenshot = get_line_plot(output_type_data[0]['time'],outputs, labels=titles, title = f"{output_key} Sensor Data",xlabel='time (s)')
+                request.node.screenshots.append(screenshot)
+            else:
+                screenshot = get_mpl_plot(outputs, axes_num=3,titles=titles,color_map=plt.cm.jet,colorbar=True)
+                request.node.screenshots.append(screenshot)
+    
+    # =============================================================================
+    # COMPARISON
+    # =============================================================================
+    
+    calc_dice_coeff = compare_data['dice_coefficient']
+    total_dice_coeff = []
+    
+    for output in results_outputs:
+        logging.info(f"\nComparing {output}")
+        if results_type == 3:
+            dice_coeff = calc_dice_coeff(ref_rms_results_dict[output],test_rms_results_dict[output])
+            total_dice_coeff.append(dice_coeff)
+            dice_coeff = calc_dice_coeff(ref_peak_results_dict[output],test_peak_results_dict[output])
+            total_dice_coeff.append(dice_coeff)
+        else:
+            dice_coeff = calc_dice_coeff(ref_rmsorpeak_results_dict[output],test_rmsorpeak_results_dict[output])
+            total_dice_coeff.append(dice_coeff)
+
+    final_dice_coeff = np.mean(total_dice_coeff)
+    
+    assert final_dice_coeff == pytest.approx(1.0, rel=1e-9), f"Average DICE coefficient is not 1"

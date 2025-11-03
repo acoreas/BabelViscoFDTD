@@ -34,9 +34,9 @@ config = configparser.ConfigParser()
 config.read('Tests' + os.sep + 'config.ini')
 gpu_device = config['GPU']['device_name']               # GPU device used for test
 print('Using GPU device: ',gpu_device)
-test_data_folder = config['Paths']['data_folder_path']  # Folder containing input test data
-ref_output_dir = config['Paths']['ref_output_folder_1']   # Folder containing previously generated BabelBrain outputs. Used in regression tests
-gen_output_dir = config['Paths']['gen_output_folder']   # Folder to store newly generated BabelBrain outputs. Used for generate_outputs "test"
+ref_output_dir = f"Tests/Generate_Outputs/Generated_Outputs/{config['Paths']['ref_output_folder_1_name']}/"   # Folder containing previously generated outputs. Used in regression tests
+ref_output_dir_2 = f"Tests/Generate_Outputs/Generated_Outputs/{config['Paths']['ref_output_folder_2_name']}/"   # Folder containing previously generated outputs. Used in test_two_outputs tests
+gen_output_dir = f"Tests/Generate_Outputs/Generated_Outputs/{config['Paths']['gen_output_folder_name']}/"   # Folder to store newly generated outputs. Used for generate_outputs "test"
 REPORTS_DIR = "PyTest_Reports"
 
 # ================================================================================================================================
@@ -171,6 +171,14 @@ def get_gpu_device():
         return gpu_device
 
     return _get_gpu_device
+
+@pytest.fixture(scope="session")
+def get_config_dirs():
+    config_dirs = {}
+    config_dirs["ref_dir_1"] = ref_output_dir
+    config_dirs["ref_dir_2"] = ref_output_dir_2
+    config_dirs["gen_output_dir"] = gen_output_dir
+    return config_dirs
 
 @pytest.fixture()
 def get_rmse():

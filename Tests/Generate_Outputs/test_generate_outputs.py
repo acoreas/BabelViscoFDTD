@@ -15,14 +15,19 @@ from BabelViscoFDTD.PropagationModel import PropagationModel
 from BabelViscoFDTD.PropagationModel2D import PropagationModel2D
 
 pytest.mark.generate_outputs
-def test_generate_PropagationModel_outputs(frequency,ppw,computing_backend,get_gpu_device,setup_propagation_model,request):
+def test_generate_PropagationModel_outputs(frequency,ppw,computing_backend,get_gpu_device,setup_propagation_model,request,get_config_dirs):
 
     # =============================================================================
     # Test Setup
     # =============================================================================
     
+    # Create output folder
+    config_dirs = get_config_dirs
+    output_dir = os.path.join(os.getcwd(),config_dirs['gen_output_dir'])
+    os.makedirs(output_dir,exist_ok=True)
+    
     # output file name
-    output_file = os.path.join(os.getcwd(),f"Tests/Generate_Outputs/Generated_Outputs/PropagationModel_{computing_backend['type']}_{int(frequency/1e3)}kHz_{ppw}PPW")
+    output_file = f"{output_dir}/PropagationModel_{computing_backend['type']}_{int(frequency/1e3)}kHz_{ppw}PPW"
         
     # =============================================================================
     # PROPAGATIONMODEL SETUP
@@ -92,14 +97,19 @@ def test_generate_PropagationModel_outputs(frequency,ppw,computing_backend,get_g
     np.save(output_file,gpu_results)
     
     pytest.mark.generate_outputs
-def test_generate_PropagationModel2D_outputs(frequency,ppw,computing_backend,get_gpu_device,setup_propagation_model,request):
+def test_generate_PropagationModel2D_outputs(frequency,ppw,computing_backend,get_gpu_device,setup_propagation_model,request,get_config_dirs):
 
     # =============================================================================
     # Test Setup
     # =============================================================================
     
+    # Create output folder
+    config_dirs = get_config_dirs
+    output_dir = os.path.join(os.getcwd(),config_dirs['gen_output_dir'])
+    os.makedirs(output_dir,exist_ok=True)
+    
     # output file name
-    output_file = os.path.join(os.getcwd(),f"Tests/Generate_Outputs/Generated_Outputs/PropagationModel2D_{computing_backend['type']}_{int(frequency/1e3)}kHz_{ppw}PPW")
+    output_file = f"{output_dir}/PropagationModel2D_{computing_backend['type']}_{int(frequency/1e3)}kHz_{ppw}PPW"
         
     # =============================================================================
     # PROPAGATIONMODEL SETUP
