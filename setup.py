@@ -19,7 +19,7 @@ import sysconfig
 
 dir_path =path.dirname(os.path.realpath(__file__))+os.sep
 
-version = '1.1.4'
+version = '1.1.5'
 
 npinc=np.get_include()
 # Filename for the C extension module library
@@ -189,7 +189,7 @@ if 'Darwin' not in platform.system():
 
 
     print('Adding  CPU')
-    ext_modules=[CMakeExtension(c_module_name+'_single',),
+    ext_modules=[CMakeExtension(c_module_name+'_single'),
                 CMakeExtension(c_module_name+'_double')]
     
     cmdclass= {'build_ext': CMakeBuild}
@@ -309,7 +309,11 @@ else:
                             include_dirs=[npinc]))
     cmdclass = {'build_ext':DarwinInteropBuildExt}#, 'install':PostInstallCommand}
     
-
+try:
+    readmecontent=open('README.md').read()
+except:
+    readmecontent=open('README.md',encoding="utf8").read()
+    
 setup(name="BabelViscoFDTD",
         version=version,
         packages=['BabelViscoFDTD','BabelViscoFDTD.tools'],
@@ -318,7 +322,7 @@ setup(name="BabelViscoFDTD",
         package_data={'BabelViscoFDTD': ['_gpu_kernel.c','_indexing.h','_gpu_kernel2D.c','_indexing2D.h']},
         author_email='samuel.pichardo@ucalgary.ca',
         keywords=['FDTD', 'CUDA', 'OpenCL','Metal','viscoelastic'],
-        long_description=open('README.md').read(),
+        long_description=readmecontent,
         long_description_content_type='text/markdown',
         cmdclass=cmdclass,
         ext_modules=ext_modules,
