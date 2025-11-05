@@ -19,7 +19,7 @@ if sys.platform == "darwin":
 from BabelViscoFDTD.PropagationModel2D import PropagationModel2D
 
 @pytest.mark.skip("CPU backend for 2D sims is not yet supported")
-def test_PropagationModel2D_vs_CPU(frequency,ppw,computing_backend,get_gpu_device,request,setup_propagation_model,get_line_plot,get_mpl_plot,compare_data):
+def test_PropagationModel2D_vs_CPU(frequency,ppw,computing_backend,get_gpu_device,request,setup_propagation_model,get_line_plot,get_mpl_plot,compare_data,tolerance):
     
     # Save plot screenshots to be added to html report later
     request.node.screenshots = []
@@ -181,19 +181,19 @@ def test_PropagationModel2D_vs_CPU(frequency,ppw,computing_backend,get_gpu_devic
     for output in results_outputs:
         logging.info(f"\nComparing {output}")
         if results_type == 3:
-            dice_coeff = calc_dice_coeff(rms_results_cpu_dict[output],rms_results_gpu_dict[output])
+            dice_coeff = calc_dice_coeff(rms_results_cpu_dict[output],rms_results_gpu_dict[output],rel_tolerance=tolerance)
             total_dice_coeff.append(dice_coeff)
-            dice_coeff = calc_dice_coeff(peak_results_cpu_dict[output],peak_results_gpu_dict[output])
+            dice_coeff = calc_dice_coeff(peak_results_cpu_dict[output],peak_results_gpu_dict[output],rel_tolerance=tolerance)
             total_dice_coeff.append(dice_coeff)
         else:
-            dice_coeff = calc_dice_coeff(rmsorpeak_results_cpu_dict[output],rmsorpeak_results_gpu_dict[output])
+            dice_coeff = calc_dice_coeff(rmsorpeak_results_cpu_dict[output],rmsorpeak_results_gpu_dict[output],rel_tolerance=tolerance)
             total_dice_coeff.append(dice_coeff)
 
     final_dice_coeff = np.mean(total_dice_coeff)
     
     assert final_dice_coeff == pytest.approx(1.0, rel=1e-9), f"Average DICE coefficient is not 1"
 
-def test_PropagationModel2D_regression(frequency,ppw,computing_backend,get_gpu_device,setup_propagation_model,request,get_mpl_plot,get_line_plot,compare_data,get_config_dirs,load_files):
+def test_PropagationModel2D_regression(frequency,ppw,computing_backend,get_gpu_device,setup_propagation_model,request,get_mpl_plot,get_line_plot,compare_data,get_config_dirs,tolerance):
 
     # =============================================================================
     # Test Setup
@@ -340,12 +340,12 @@ def test_PropagationModel2D_regression(frequency,ppw,computing_backend,get_gpu_d
     for output in results_outputs:
         logging.info(f"\nComparing {output}")
         if results_type == 3:
-            dice_coeff = calc_dice_coeff(ref_rms_results_dict[output],test_rms_results_dict[output])
+            dice_coeff = calc_dice_coeff(ref_rms_results_dict[output],test_rms_results_dict[output],rel_tolerance=tolerance)
             total_dice_coeff.append(dice_coeff)
-            dice_coeff = calc_dice_coeff(ref_peak_results_dict[output],test_peak_results_dict[output])
+            dice_coeff = calc_dice_coeff(ref_peak_results_dict[output],test_peak_results_dict[output],rel_tolerance=tolerance)
             total_dice_coeff.append(dice_coeff)
         else:
-            dice_coeff = calc_dice_coeff(ref_rmsorpeak_results_dict[output],test_rmsorpeak_results_dict[output])
+            dice_coeff = calc_dice_coeff(ref_rmsorpeak_results_dict[output],test_rmsorpeak_results_dict[output],rel_tolerance=tolerance)
             total_dice_coeff.append(dice_coeff)
 
     final_dice_coeff = np.mean(total_dice_coeff)
