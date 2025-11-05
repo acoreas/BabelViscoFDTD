@@ -353,3 +353,127 @@ def test_PropagationModel_regression(frequency,ppw,computing_backend,get_gpu_dev
     final_dice_coeff = np.mean(total_dice_coeff)
     
     assert final_dice_coeff == pytest.approx(1.0, rel=1e-9), f"Average DICE coefficient is not 1"
+
+
+def test_PropagationModel_two_outputs(frequency,ppw,computing_backend,get_gpu_device,setup_propagation_model,request,get_mpl_plot,get_line_plot,compare_data,get_config_dirs,load_files,tolerance):
+
+    # =============================================================================
+    # Test Setup
+    # =============================================================================
+    
+    config_dirs = get_config_dirs
+    ref_dir_1 = config_dirs['ref_dir_1']
+    ref_dir_2 = config_dirs['ref_dir_2']
+    
+    # Save plot screenshots to be added to html report later
+    request.node.screenshots = []
+    
+    # Reference file name
+    ref_file_1 = os.path.join(ref_dir_1,f"PropagationModel_{computing_backend['type']}_{int(frequency/1e3)}kHz_{ppw}PPW")
+    ref_file_2 = os.path.join(ref_dir_2,f"PropagationModel_{computing_backend['type']}_{int(frequency/1e3)}kHz_{ppw}PPW")
+    
+    # Results
+    results_type = 3 # Return RMS Data (1), Peak Data (2), or both (3)
+    results_outputs = ['Vx','Vy','Vz','Pressure','Sigmaxx','Sigmayy', 'Sigmazz','Sigmaxy','Sigmaxz','Sigmayz']
+    sensor_outputs = ['Pressure','Vx','Vy','Vz','Sigmaxx','Sigmayy', 'Sigmazz','Sigmaxy','Sigmaxz','Sigmayz']
+    
+    # =============================================================================
+    # LOAD RESULTS
+    # =============================================================================
+    
+    # Finalize reference file names
+    logging.info('Reloading Reference results')
+    if results_type == 1:
+        results_type_str = "RMS"
+    elif results_type == 2:
+        results_type_str = "Peak"
+    else:
+        results_type_str = "RMS_Peak"
+    ref_file_1 += f"_{len(results_outputs)}_{results_type_str}_results.npy"
+    ref_file_2 += f"_{len(results_outputs)}_{results_type_str}_results.npy"
+    
+    # Load reference file 1 as truth
+    try:
+        logging.info(f"Loading {ref_file_1}")
+        ref_results = np.load(ref_file_1, allow_pickle=True)
+    except:
+        ref_file = re.sub(f"_{computing_backend['type']}","**",ref_file_1)
+        alt_ref_file = glob.glob(ref_file,recursive=True)[0]
+        ref_results = np.load(alt_ref_file, allow_pickle=True)
+        logging.info(f"{ref_file_1} unavailable, loading {alt_ref_file} instead")
+        
+    # Load reference file 2 as test
+    try:
+        logging.info(f"Loading {ref_file_2}")
+        test_results = np.load(ref_file_2, allow_pickle=True)
+    except:
+        test_file = re.sub(f"_{computing_backend['type']}","**",ref_file_2)
+        alt_test_file = glob.glob(test_file,recursive=True)[0]
+        test_results = np.load(alt_test_file, allow_pickle=True)
+        logging.info(f"{ref_file_2} unavailable, loading {alt_test_file} instead")
+    
+    # Unpack results
+    if results_type == 3:
+        ref_sensor_results_dict,ref_last_map_dict,ref_rms_results_dict,ref_peak_results_dict,ref_input_params = ref_results
+        test_sensor_results_dict,test_last_map_dict,test_rms_results_dict,test_peak_results_dict,test_input_params = test_results
+    else:
+        ref_sensor_results_dict,ref_last_map_dict,ref_rmsorpeak_results_dict,ref_input_params = ref_results
+        test_sensor_results_dict,test_last_map_dict,test_rmsorpeak_results_dict,test_input_params = test_results
+    
+    # =============================================================================
+    # VISUALISATION
+    # =============================================================================
+    output_types = {'Sensor': [ref_sensor_results_dict, test_sensor_results_dict]}
+    if results_type == 1:
+        output_types['RMS'] = [ref_rmsorpeak_results_dict, test_rmsorpeak_results_dict]
+    elif results_type == 2:
+        output_types['Peak'] = [ref_rmsorpeak_results_dict, test_rmsorpeak_results_dict]
+    else:
+        output_types['RMS']  = [ref_rms_results_dict, test_rms_results_dict]
+        output_types['Peak'] = [ref_peak_results_dict, test_peak_results_dict]
+    
+    for output_type_key,output_type_data in output_types.items():
+        for output_key in output_type_data[0].keys():
+            outputs = []
+            titles = []
+            
+            if output_key == 'time':
+                continue
+            
+            outputs.append(output_type_data[0][output_key])
+            outputs.append(output_type_data[1][output_key])
+            outputs.append(abs(output_type_data[0][output_key]-output_type_data[1][output_key]))
+            titles.append(f"{output_type_key} {output_key} - CPU")
+            titles.append(f"{output_type_key} {output_key} - GPU")
+            titles.append(f"{output_type_key} {output_key} - Difference")
+          
+            if output_type_key == 'Sensor':
+                for i in range(len(outputs)):
+                    outputs[i] = outputs[i][outputs[i].shape[0]//2,:] # Use halfway time point
+                screenshot = get_line_plot(output_type_data[0]['time'],outputs, labels=titles, title = f"{output_key} Sensor Data",xlabel='time (s)')
+                request.node.screenshots.append(screenshot)
+            else:
+                screenshot = get_mpl_plot(outputs, axes_num=3,titles=titles,color_map=plt.cm.jet,colorbar=True)
+                request.node.screenshots.append(screenshot)
+    
+    # =============================================================================
+    # COMPARISON
+    # =============================================================================
+    
+    calc_dice_coeff = compare_data['dice_coefficient']
+    total_dice_coeff = []
+    
+    for output in results_outputs:
+        logging.info(f"\nComparing {output}")
+        if results_type == 3:
+            dice_coeff = calc_dice_coeff(ref_rms_results_dict[output],test_rms_results_dict[output],rel_tolerance=tolerance)
+            total_dice_coeff.append(dice_coeff)
+            dice_coeff = calc_dice_coeff(ref_peak_results_dict[output],test_peak_results_dict[output],rel_tolerance=tolerance)
+            total_dice_coeff.append(dice_coeff)
+        else:
+            dice_coeff = calc_dice_coeff(ref_rmsorpeak_results_dict[output],test_rmsorpeak_results_dict[output],rel_tolerance=tolerance)
+            total_dice_coeff.append(dice_coeff)
+
+    final_dice_coeff = np.mean(total_dice_coeff)
+    
+    assert final_dice_coeff == pytest.approx(1.0, rel=1e-9), f"Average DICE coefficient is not 1"
