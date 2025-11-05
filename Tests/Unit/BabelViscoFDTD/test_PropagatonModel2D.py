@@ -44,8 +44,8 @@ def test_PropagationModel2D_vs_CPU(frequency,ppw,computing_backend,get_gpu_devic
     
     # Additional setup
     results_type = 3 # Return RMS Data (1), Peak Data (2), or both (3)
-    results_outputs = ['Vx','Vy','Vz','Pressure','Sigmaxx','Sigmayy', 'Sigmazz','Sigmaxy','Sigmaxz','Sigmayz']
-    sensor_outputs = ['Pressure','Vx','Vy','Vz','Sigmaxx','Sigmayy', 'Sigmazz','Sigmaxy','Sigmaxz','Sigmayz']
+    results_outputs = ['Vx','Vy','Pressure','Sigmaxx','Sigmayy','Sigmaxy']
+    sensor_outputs = ['Pressure','Vx','Vy','Sigmaxx','Sigmayy','Sigmaxy']
     
     computing_backend_index = 0 # default to CPU
     if computing_backend['type'] == 'CUDA':
@@ -225,8 +225,8 @@ def test_PropagationModel2D_regression(frequency,ppw,computing_backend,get_gpu_d
     
     # Additional setup
     results_type = 3 # Return RMS Data (1), Peak Data (2), or both (3)
-    results_outputs = ['Vx','Vy','Vz','Pressure','Sigmaxx','Sigmayy', 'Sigmazz','Sigmaxy','Sigmaxz','Sigmayz']
-    sensor_outputs = ['Pressure','Vx','Vy','Vz','Sigmaxx','Sigmayy', 'Sigmazz','Sigmaxy','Sigmaxz','Sigmayz']
+    results_outputs = ['Vx','Vy','Pressure','Sigmaxx','Sigmayy','Sigmaxy']
+    sensor_outputs = ['Pressure','Vx','Vy','Sigmaxx','Sigmayy','Sigmaxy']
     
     computing_backend_index = 0 # default to CPU
     if computing_backend['type'] == 'CUDA':

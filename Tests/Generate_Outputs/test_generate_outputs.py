@@ -129,8 +129,8 @@ def test_generate_PropagationModel2D_outputs(frequency,ppw,computing_backend,get
     
     # Additional setup
     results_type = 3 # Return RMS Data (1), Peak Data (2), or both (3)
-    results_outputs = ['Vx','Vy','Vz','Pressure','Sigmaxx','Sigmayy', 'Sigmazz','Sigmaxy','Sigmaxz','Sigmayz']
-    sensor_outputs = ['Pressure','Vx','Vy','Vz','Sigmaxx','Sigmayy', 'Sigmazz','Sigmaxy','Sigmaxz','Sigmayz']
+    results_outputs = ['Vx','Vy','Pressure','Sigmaxx','Sigmayy','Sigmaxy']
+    sensor_outputs = ['Pressure','Vx','Vy','Sigmaxx','Sigmayy','Sigmaxy']
     
     computing_backend_index = 0 # default to CPU
     if computing_backend['type'] == 'CUDA':
