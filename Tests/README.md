@@ -1,6 +1,6 @@
 # Pytest Setup and Usage Guide
 
-This guide provides instructions for setting up and running pytest tests for BabelBrain, along with additional instructions for using it in Visual Studio Code.
+This guide provides instructions for setting up and running pytest tests for BabelViscoFDTD, along with additional instructions for using it in Visual Studio Code.
 
 ## Installation
 Before you begin, ensure you have Pytest installed in your environment.
@@ -9,7 +9,7 @@ Before you begin, ensure you have Pytest installed in your environment.
 pip install pytest
 ```
 
-The following packages are also required for BabelBrain pytests:
+The following packages are also required for BabelViscoFDTD pytests:
 - pytest-html (Generating html test reports)
 - pytest-metadata 
 - pytest-qt (Handling QT applications)
@@ -76,7 +76,7 @@ BabelViscoFDTD/
 ## Running Tests
 ### In terminal
 
-In the highest level directory of BabelBrain, simply execute the `pytest` command in your terminal. This command will discover and run **ALL** tests. Note that pytest will automatically be configured based on parameters specified in the `pytest.ini` file. 
+In the highest level directory of BabelViscoFDTD, simply execute the `pytest` command in your terminal. This command will discover and run **ALL** tests. Note that pytest will automatically be configured based on parameters specified in the `pytest.ini` file. 
 
 A timestamped report of all tests ran will automatically be saved to the `Pytest_Reports` folder while the individual tests ran will also be saved to `Pytest_Reports/individual_tests/`
 
@@ -132,14 +132,14 @@ Note that the commandline arguments are still specified in the `pytest.ini` file
 Alternatively, tests can be run from the integrated terminal similar to previous section.
 
 
-## Additional Setup for BabelBrain testing
+## Additional Setup for BabelViscoFDTD testing
 Certain tests require a directory containing test data, GPU device name, etc. These parameters are specified in the `config.ini` which is an untracked file as it is user-specific. If it's your first time running tests, you should create the `config.ini` file inside the `Tests/` folder (see folder structure example from earlier) and format it as follows:
 
 ```plaintext
 [Paths]
-data_folder_path  = <path to test data>
-ref_output_folder = <path to reference BabelBrain output data>
-gen_output_folder = <path to folder to store outputs from test_generate_outputs.py>
+ref_output_folder_1_name = <folder name containing reference BabelViscoFDTD output data>
+ref_output_folder_2_name = <folder name containing second reference BabelViscoFDTD output data>
+gen_output_folder_name = <folder name to store outputs from test_generate_outputs.py>
 
 [GPU]
 device_name = <GPU device name> 
@@ -147,13 +147,11 @@ device_name = <GPU device name>
 
 Where the
 
-`data_folder_path` folder contains test data including image sets
+`ref_output_folder_1_name` folder contains previously generated BabelViscoFDTD outputs to be use in regression testing (i.e. test current setup against this reference).
 
-`ref_output_folder_1` folder contains previously generated BabelViscoFDTD outputs to be use in regression testing (i.e. test current setup against this reference).
+`ref_output_folder_2_name` folder contains another previously generated BabelViscoFDTD outputs. Used when you want to compare two already generated ouput folders.
 
-`ref_output_folder_2` folder contains another previously generated BabelViscoFDTD outputs. Used when you want to compare two already generated ouput folders.
-
-`gen_output_folder` folder is where output data generated from Generate_Outputs "Tests" will be stored
+`gen_output_folder_name` folder is where output data generated from Generate_Outputs "Tests" will be stored. It will be stored at the following location: `Tests/Generate_Outputs/Generated_Outputs/<gen_output_folder_name>`
 
 <!-- <pre>
 BabelBrain_Test_Data/
