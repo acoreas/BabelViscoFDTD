@@ -7,10 +7,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
-# Ensure that we don't use the local version of BabelViscoFDTD as this will fail through a missing library error
-working_dir = os.getcwd()
-if working_dir in sys.path:
-    sys.path.remove(working_dir)
+# Ensure that we don't use the local version of BabelViscoFDTD for apple systems as this will fail through a missing library error
+if sys.platform == "darwin":
+    working_dir = os.getcwd()
+    if working_dir in sys.path:
+        sys.path.remove(working_dir)
 
 # Grab BabelViscoFDTD from environment
 from BabelViscoFDTD.tools.RayleighAndBHTE import BHTE, ForwardSimple, InitCuda, InitOpenCL, InitMetal, InitMLX, GenerateSurface
