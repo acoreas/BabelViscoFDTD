@@ -1,4 +1,3 @@
-
 import datetime
 import os
 import sys
@@ -731,11 +730,11 @@ def set_up_domain():
             return np.round(202.76362433*((frequency/1e6)**bcoeff)*reductionFactor) 
         
         material_list={}                        #Density (kg/m3)    LongSoS (m/s),                  ShearSoS (m/s),                 Long Att (Np/m),                        Shear Att (Np/m)
-        material_list['water']       = np.array([1000.0,            1500.0,                         0.0,                            0.0,                                    0.0] )
-        # material_list['cortical']    = np.array([1896.5,            FitSpeedCorticalLong(freq),     FitSpeedCorticalShear(freq),    FitAttCorticalLong_Multiple(freq),      FitAttBoneShear(freq)])
+        material_list['water']       = np.array([1000.0,            1500.0,                         0,                              0.0,                                    0] )
+        material_list['cortical']    = np.array([1896.5,            FitSpeedCorticalLong(freq),     FitSpeedCorticalShear(freq),    FitAttCorticalLong_Multiple(freq),      FitAttBoneShear(freq)])
         material_list['trabecular']  = np.array([1738.0,            FitSpeedTrabecularLong(freq),   FitSpeedTrabecularShear(freq),  FitAttTrabecularLong_Multiple(freq),    FitAttBoneShear(freq)])
-        material_list['skin']        = np.array([1116.0,            1537.0,                         0.0,                            2.3*freq/500e3 ,                        0])
-        material_list['brain']       = np.array([1041.0,            1562.0,                         0.0,                            3.45*freq/500e3 ,                       0])
+        material_list['skin']        = np.array([1116.0,            1537.0,                         0.0,                            2.3*freq/500e3 ,                        0.0])
+        material_list['brain']       = np.array([1041.0,            1562.0,                         0.0,                            3.45*freq/500e3 ,                       0.0])
     
         return material_list
 
@@ -767,90 +766,72 @@ def set_up_domain():
         
     def _create_grid(grid_limits=[], grid_steps=[], pml_thickness=0):
         """
-        Create a 2D or 3D computational grid depending on input dimensions.
-        
-        Parameters
-        ----------
-        grid_limits : list
-            For 3D: [xmin, xmax, ymin, ymax, zmin, zmax] or [xmax, ymax, zmax]
-            For 2D: [xmin, xmax, ymin, ymax] or [xmax, ymax]
-        grid_steps : list
-            For 3D: [dx, dy, dz]
-            For 2D: [dx, dy]
-        pml_thickness : int, optional
-            Number of grid points to extend on each side for PML (absorbing boundary)
+        Create a 2D or 3D computational grid with exact grid_steps,
+        including optional PML extension.
         """
-        
-        # Determine dimensionality from grid_steps
+
+        # Validate input as 2D or 3D
         dim = len(grid_steps)
         if dim not in (2, 3):
             raise ValueError("grid_steps must have 2 (2D) or 3 (3D) elements.")
-    
-        # Expand grid_limits depending on input format
+
+        # Determine grid limits and spatial steps
         if dim == 3:
             if len(grid_limits) == 6:
                 xmin, xmax, ymin, ymax, zmin, zmax = grid_limits
             elif len(grid_limits) == 3:
-                xmin = ymin = zmin = 0
+                xmin = ymin = zmin = 0.0
                 xmax, ymax, zmax = grid_limits
             else:
-                raise ValueError("Invalid number of grid limit arguments for 3D grid.")
+                raise ValueError("Invalid grid_limits for 3D.")
             dx, dy, dz = grid_steps
-        else:  # 2D
+        else:
             if len(grid_limits) == 4:
                 xmin, xmax, ymin, ymax = grid_limits
             elif len(grid_limits) == 2:
-                xmin = ymin = 0
+                xmin = ymin = 0.0
                 xmax, ymax = grid_limits
             else:
-                raise ValueError("Invalid number of grid limit arguments for 2D grid.")
+                raise ValueError("Invalid grid_limits for 2D.")
             dx, dy = grid_steps
-        
-       # Compute grid sizes
-        def calc_N(xmin, xmax, d, pml):
-            base = np.ceil((xmax - xmin) / d) + 1
-            return int(base + 2 * pml) if pml else int(base)
 
-        Nx = calc_N(xmin, xmax, grid_steps[0], pml_thickness)
-        Ny = calc_N(ymin, ymax, grid_steps[1], pml_thickness)
+        # Determine intervals
+        x = np.arange(xmin - pml_thickness*dx, xmax + 0.5*dx + pml_thickness*dx, dx)
+        y = np.arange(ymin - pml_thickness*dy, ymax + 0.5*dy + pml_thickness*dy, dy)
         if dim == 3:
-            Nz = calc_N(zmin, zmax, grid_steps[2], pml_thickness)
-        else:
-            Nz = None
+            z = np.arange(zmin - pml_thickness*dz, zmax + 0.5*dz + pml_thickness*dy, dz)
         
-        # Create 1D coordinate arrays
-        x = np.linspace(xmin, xmax, Nx, np.float64)
-        y = np.linspace(ymin, ymax, Ny, np.float64)
+        # Create and return meshgrid
         if dim == 3:
-            z = np.linspace(zmin, zmax, Nz, np.float64)
-            X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
+            X, Y, Z = np.meshgrid(x, y, z, indexing="ij")
             return X, Y, Z
         else:
-            X, Y = np.meshgrid(x, y, indexing='ij')
+            X, Y = np.meshgrid(x, y, indexing="ij")
             return X, Y
         
     return {'grid': _create_grid,
             'medium_bhte': _set_medium_bhte,
             'material_list_bhte': _get_material_list_bhte,
             'material_list_vwe': _get_material_list_vwe}
-    
+
 @pytest.fixture()
 def setup_propagation_model(set_up_domain,get_mpl_plot,get_line_plot,request):
-    def _setup_propagation_model(us_frequency, points_per_wavelength, axes = 3, skip_plots=False):
-        
+    def _setup_propagation_model(us_frequency, points_per_wavelength, axes = 3, map_type="mixed",source_shape ="circular",skip_plots=False):
+
         # =============================================================================
         # SIMULATION PARAMETERS
         # =============================================================================
-        
+
         dt = 5e-8                       # time step
         medium_SOS = 1500               # m/s - water
         medium_density = 1000           # kg/m3
         pml_thickness = 12              # grid points for perfect matching layer
         reflection_limit = 1.0000e-05   # reflection parameter for PML
-        tx_diameter = 0.03              # m - circular piston
+        tx_radius = 0.025               # m - circular or square piston
         tx_plane_loc = 0.01             # m - in XY plane at Z = 0.01 m
         us_amplitude = 100e3            # Pa
-        
+
+        # Domain Dimensions
         if axes == 3:
             x_dim = 0.05                # m
             y_dim = 0.05                # m
@@ -862,94 +843,117 @@ def setup_propagation_model(set_up_domain,get_mpl_plot,get_line_plot,request):
         # =============================================================================
         # SIMULATION DOMAIN SETUP
         # =============================================================================
-        
+
         # Domain Properties
         shortest_wavelength = medium_SOS/us_frequency
         spatial_step = shortest_wavelength/ points_per_wavelength
 
-        # Domain Dimensions
+        # Create meshgrid
         if axes == 3:
-            domain_dims =  np.array([x_dim,y_dim,z_dim])  # in m, x,y,z
-            
-            X,Y,Z = set_up_domain['grid'](grid_limits = [-x_dim/2,x_dim/2,-y_dim/2,y_dim/2,0,z_dim],
-                                          grid_steps=3*[spatial_step],
-                                          pml_thickness=pml_thickness)
+            X, Y, Z = set_up_domain['grid'](grid_limits=[-x_dim/2, x_dim/2, -y_dim/2, y_dim/2, 0, z_dim],
+                                            grid_steps=3*[spatial_step],
+                                            pml_thickness=pml_thickness)
         else:
-            domain_dims =  np.array([x_dim,y_dim])  # in m, x and y
-            
-            X,Y = set_up_domain['grid'](grid_limits = [-x_dim/2,x_dim/2,0,y_dim],
-                                        grid_steps=2*[spatial_step],
-                                        pml_thickness=pml_thickness)
-            
-        
+            X, Y = set_up_domain['grid'](grid_limits=[-x_dim/2, x_dim/2, 0, y_dim],
+                                         grid_steps=2*[spatial_step],
+                                         pml_thickness=pml_thickness)
         logging.info(f'Domain size: {X.shape}')
 
-        # Time Dimensions
+        # Calculate time to cross from one corner to opposite corner
         if axes == 3:
-            sim_time = np.sqrt(domain_dims[0]**2+domain_dims[1]**2+domain_dims[2]**2)/medium_SOS #time to cross one corner to another
+            sim_time = np.sqrt(x_dim**2+y_dim**2+z_dim**2)/medium_SOS 
         else:
-            sim_time = np.sqrt(domain_dims[0]**2+domain_dims[1]**2)/medium_SOS #time to cross one corner to another
-        sensor_steps = int((1/us_frequency/8)/dt) # for the sensors, we do not need so much high temporal resolution, so we are keeping 8 time points per perioid
+            sim_time = np.sqrt(x_dim**2+y_dim**2)/medium_SOS
+
+        # Number of sensor steps i.e. how many timepoints we record babelvisco results
+        sensor_steps = int((1/us_frequency/8)/dt) # for the sensors, we do not need really high temporal resolution, so we are keeping 8 time points per period
 
         # =============================================================================
         # MATERIAL MAP SETUP
         # =============================================================================
-        
+
         # Retrieve list of different materials (e.g. brain, skull, etc.)
-        material_list = set_up_domain['material_list_vwe'](us_frequency)
-        material_list = np.array(list(material_list.values()))
-        water_index = 0
-        skull_index = 1
-        skin_index  = 2
-        brain_index = 3
+        material_list = set_up_domain["material_list_vwe"](us_frequency)
+        ml_keys, ml_values = zip(*material_list.items())
+        ml_keys = np.array(ml_keys)
+        material_list = np.array(ml_values)
         
+        # Map value for each tissue type
+        index_water = np.where(np.array(ml_keys) == "water")[0][0]
+        index_cortical = np.where(np.array(ml_keys) == "cortical")[0][0]
+        index_trabecular = np.where(np.array(ml_keys) == "trabecular")[0][0]
+        index_skin = np.where(np.array(ml_keys) == "skin")[0][0]
+        index_brain = np.where(np.array(ml_keys) == "brain")[0][0]
+
         # Initialize material map as all water
-        material_map = water_index * np.ones_like(X,np.uint32) # Initialize as all water
-        
-        # Add spheres of different materials at different locations
-        def add_material_sphere(material_index,material_radius,material_center,center_offsets):
-            material_center[0] += center_offsets[0]
-            material_center[1] += center_offsets[1]
+        material_map = index_water * np.ones_like(X,np.uint32)
+
+        # Modify material map based on map type
+        if map_type == "mixed":
+            # Add spheres of different materials at different locations
+            def add_material_sphere(material_index,material_radius,material_center,center_offsets):
+                material_center[0] += center_offsets[0]
+                material_center[1] += center_offsets[1]
+                if axes == 3:
+                    material_center[2] += center_offsets[2]
+
+                if axes == 3:
+                    r = np.sqrt((X - material_center[0])**2 + (Y - material_center[1])**2 + (Z - material_center[2])**2)
+                else:
+                    r = np.sqrt((X - material_center[0])**2 + (Y - material_center[1])**2)
+                material_mask = r <= material_radius
+                material_map[material_mask] = material_index
+
             if axes == 3:
-                material_center[2] += center_offsets[2]
-            
-            if axes == 3:
-                r = np.sqrt((X - material_center[0])**2 + (Y - material_center[1])**2 + (Z - material_center[2])**2)
+                mat_radius = tx_radius/2
+                add_material_sphere(index_cortical,mat_radius,[0, 0, z_dim/2],center_offsets=[0,-1*mat_radius,0])
+                add_material_sphere(index_brain, mat_radius,[0, 0, z_dim/2],center_offsets=[0,mat_radius,2*mat_radius])
+                add_material_sphere(index_skin,mat_radius,[0, 0, z_dim/2],center_offsets=[0,mat_radius,-2*mat_radius])
             else:
-                r = np.sqrt((X - material_center[0])**2 + (Y - material_center[1])**2)
-            material_mask = r <= material_radius
-            material_map[material_mask] = material_index
-        
-        if axes == 3:
-            mat_radius = tx_diameter/4
-            add_material_sphere(skull_index,mat_radius,[0, 0, z_dim/2],center_offsets=[0,-1*mat_radius,0])
-            add_material_sphere(brain_index, mat_radius,[0, 0, z_dim/2],center_offsets=[0,mat_radius,2*mat_radius])
-            add_material_sphere(skin_index,mat_radius,[0, 0, z_dim/2],center_offsets=[0,mat_radius,-2*mat_radius])
-        else:
-            mat_radius = tx_diameter
-            add_material_sphere(skull_index,mat_radius,[0, y_dim/2],center_offsets=[-1*mat_radius,0])
-            add_material_sphere(brain_index, mat_radius,[0, y_dim/2],center_offsets=[mat_radius,2*mat_radius])
-            add_material_sphere(skin_index,mat_radius,[0, y_dim/2],center_offsets=[mat_radius,-2*mat_radius])
-        
+                mat_radius = tx_radius*2
+                add_material_sphere(index_cortical,mat_radius,[0, y_dim/2],center_offsets=[-1*mat_radius,0])
+                add_material_sphere(index_brain, mat_radius,[0, y_dim/2],center_offsets=[mat_radius,2*mat_radius])
+                add_material_sphere(index_skin,mat_radius,[0, y_dim/2],center_offsets=[mat_radius,-2*mat_radius])
+        elif map_type == "bone":
+            # Add few layers of cortical, trabecular, and more cortical bone
+            bone_thickness = 0.004 # 4mm
+            bone_layers = int(bone_thickness/spatial_step)
+            bone_start = 3 + pml_thickness
+
+            material_map[pml_thickness:-pml_thickness,pml_thickness:-pml_thickness,bone_start:bone_start+bone_layers] = index_cortical
+            material_map[pml_thickness:-pml_thickness,pml_thickness:-pml_thickness,bone_start+bone_layers:bone_start+2*bone_layers] = index_trabecular
+            material_map[pml_thickness:-pml_thickness,pml_thickness:-pml_thickness,bone_start+2*bone_layers:bone_start+3*bone_layers] = index_cortical
+        elif map_type == "water":
+            pass
+
         # =============================================================================
         # GENERATE SOURCE MAP + SIGNAL
         # =============================================================================
-        
-        # Create source map
+
+        # Determine location of transducer in z
+        if map_type == "mixed":
+            tx_loc = int(np.round(tx_plane_loc/spatial_step)) + pml_thickness
+        elif map_type == "bone" or map_type == "water":
+            tx_loc = 1 + pml_thickness
+
+        # Create source mask
         if axes == 3:
-            source_mask = (X[:,:,X.shape[2]//2]**2+Y[:,:,Y.shape[2]//2]**2) <= (tx_diameter/2.0)**2
+            if source_shape == "circular":
+                source_mask = (X[:,:,X.shape[2]//2]**2+Y[:,:,Y.shape[2]//2]**2) <= (tx_radius)**2
+            elif source_shape == "square":
+                source_mask = (np.abs(X[:,:,X.shape[2]//2]) <= tx_radius) & \
+                            (np.abs(Y[:,:,Y.shape[2]//2]) <= tx_radius)
         else:
-            source_mask = (X[:,X.shape[1]//2]**2) <= (tx_diameter/2.0)**2
+            source_mask = (X[:,X.shape[1]//2]**2) <= (tx_radius)**2
         source_mask = (source_mask*1.0).astype(np.uint32)
 
+        # Create source map
         source_map = np.zeros_like(X,np.uint32)
-        tx_loc = int(np.round(tx_plane_loc/spatial_step)) + pml_thickness
-        
         if axes == 3:
             source_map[:,:,tx_loc] = source_mask
         else:
             source_map[:,tx_loc] = source_mask
-            
+
         # Create particle displacement maps
         amp_displacement = us_amplitude/medium_density/medium_SOS
         Ox = np.zeros_like(X)
@@ -959,7 +963,7 @@ def setup_propagation_model(set_up_domain,get_mpl_plot,get_line_plot,request):
             Oz[source_map > 0] = 1 #only Z has a value of 1
         else:
             Oy[source_map > 0] = 1 #only Z has a value of 1
-            
+
         Ox *= amp_displacement
         Oy *= amp_displacement
         if axes == 3:
@@ -972,14 +976,14 @@ def setup_propagation_model(set_up_domain,get_mpl_plot,get_line_plot,request):
         # Plot source time signal
         pulse_source_tmp = np.sin(2*np.pi*us_frequency*source_time_vector)
 
-        # note we need expressively to arrange the data in a 2D array
+        # Note we need expressively to arrange the data in a 2D array
         pulse_source = np.reshape(pulse_source_tmp,(1,len(source_time_vector))) 
         print("Number of time points in source signal:",len(source_time_vector))
-        
+
         # =============================================================================
         # GENERATE SENSOR MAP
         # =============================================================================
-        
+
         # Create sensor map
         sensor_map=np.zeros_like(X,np.uint32)
         if axes == 3:
@@ -990,16 +994,17 @@ def setup_propagation_model(set_up_domain,get_mpl_plot,get_line_plot,request):
         # =============================================================================
         # SAVE PLOTS
         # =============================================================================
+        
         if not skip_plots:
             screenshot = get_mpl_plot([material_map,sensor_map,source_map], axes_num=axes,titles=['Material Map','Sensor Map','Source Map'])
             request.node.screenshots.append(screenshot)
             screenshot = get_line_plot(source_time_vector*1e6,[pulse_source_tmp],title="Source Signal")
             request.node.screenshots.append(screenshot)
-        
+
         # =============================================================================
         # SAVE PARAMETERS TO DICTIONARY
         # =============================================================================
-        
+
         propagation_model_params = {}
         propagation_model_params['material_map'] = material_map
         propagation_model_params['material_list'] = material_list
@@ -1016,11 +1021,11 @@ def setup_propagation_model(set_up_domain,get_mpl_plot,get_line_plot,request):
         propagation_model_params['reflection_limit'] = reflection_limit
         propagation_model_params['dt'] = dt
         propagation_model_params['sensor_steps'] = sensor_steps
-        
+
         return propagation_model_params
-        
+
     return _setup_propagation_model
-       
+
 # ================================================================================================================================
 # PYTEST HOOKS
 # ================================================================================================================================
